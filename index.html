@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, target-densitydpi=medium-dpi">
 <meta name="HandheldFriendly" content="True">
 <meta name="MobileOptimized" content="320">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 <title>Frekvens Søgeværktøj</title>
-<link rel="manifest" href="manifest.json">
 <style>
 :root{--primary:#2563eb;--primary-dark:#1d4ed8;--secondary:#64748b;--background:#f8fafc;--card:#ffffff;--text:#1e293b;--border:#e2e8f0;}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -41,7 +39,7 @@ tr:hover{background:var(--background)}
 .error{background:#fef2f2;color:#dc2626;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #fecaca}
 .toggle-all{background:none;border:none;color:var(--primary);cursor:pointer;font-size:0.9rem;padding:5px 0}
 
-/* ===== RESPONSIV DESIGN ===== */
+/* ===== RESPONSIV DESIGN - VIRKER PÅ CHROME OG FIREFOX PÅ ANDROID ===== */
 /* Small mobile (Galaxy S22 portrait: 393px) */
 @media screen and (max-width: 414px) {
     body { padding: 12px !important; }
@@ -217,7 +215,7 @@ function handleFileSelect(event) {
     reader.readAsArrayBuffer(file);
 }
 
-// ===== RETTET PARSECSV FUNKTION =====
+// ===== RETTET PARSECSV FUNKTION (FIX: Firmaer med tal i navnet) =====
 function parseCSV(text) {
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) return showError('CSV-filen er tom');
@@ -235,6 +233,7 @@ function parseCSV(text) {
                 if (val === '') {
                     entry[h.trim()] = '';
                 } else {
+                    // KUN konverter til tal for frekvenskolonner!
                     const headerName = h.trim();
                     if (headerName === CONFIG.frequencyStartCol ||
                         headerName === CONFIG.frequencyEndCol ||
@@ -243,12 +242,14 @@ function parseCSV(text) {
                         const num = parseFloat(val.replace(',', '.'));
                         entry[headerName] = isNaN(num) ? val : num;
                     } else {
+                        // For alle andre kolonner (inkl. Navn) - behold som tekst!
                         entry[headerName] = val;
                     }
                 }
             }
         });
 
+        // Tilføj Downlink og Uplink felter
         if (entry[CONFIG.frequencyStartCol] !== undefined && entry[CONFIG.frequencyEndCol] !== undefined) {
             const start = Math.round(entry[CONFIG.frequencyStartCol] * 1000) / 1000;
             const end = Math.round(entry[CONFIG.frequencyEndCol] * 1000) / 1000;
@@ -262,6 +263,7 @@ function parseCSV(text) {
         return entry;
     });
 
+    // Saml identiske rækker
     const grouped = {};
     allData.forEach(row => {
         const key = JSON.stringify({ Navn: row.Navn, Downlink: row.Downlink, Uplink: row.Uplink });
@@ -295,3 +297,371 @@ function parseLine(line, sep) {
 function generateCheckboxes() {
     const container = document.getElementById('columnCheckboxes');
     CONFIG.optionalColumns.forEach(col => {
+        const label = CONFIG.columnDisplayNames[col] || col;
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        const input = document.createElement('input');
+        input.type = 'checkbox'; input.id = 'col-' + col; input.onchange = updateColumns;
+        const labelEl = document.createElement('label');
+        labelEl.htmlFor = 'col-' + col; labelEl.textContent = label;
+        div.appendChild(input); div.appendChild(labelEl); container.appendChild(div);
+    });
+}
+
+function updateColumns() {
+    const fixedColumns = ['Navn', 'Downlink', 'Uplink', 'Antal', 'Kommentar'];
+    selectedColumns = [...fixedColumns];
+    CONFIG.optionalColumns.forEach(col => {
+        const cb = document.getElementById('col-' + col);
+        if (cb && cb.checked) selectedColumns.push(col);
+    });
+    renderTable();
+}
+
+function toggleAllColumns() {
+    const checkboxes = document.querySelectorAll('#columnCheckboxes input');
+    const allChecked = Array.from(checkboxes).every(c => c.checked);
+    checkboxes.forEach(c => c.checked = !allChecked);
+    document.getElementById('toggleText').textContent = allChecked ? '✓ Vælg alle' : '✗ Fravælg alle';
+    updateColumns();
+}
+
+// ===== SØGNING =====
+function search() {
+    const fromVal = document.getElementById('fromFreq').value.replace(',', '.');
+    const toVal = document.getElementById('toFreq').value.replace(',', '.');
+    const from = parseFloat(fromVal); const to = parseFloat(toVal);
+    const unit = document.getElementById('frequencyUnit').value;
+    const nameFilter = document.getElementById('nameSearch').value.toLowerCase();
+    const commentFilter = document.getElementById('commentSearch').value.toLowerCase();
+
+    if (isNaN(from) && isNaN(to) && nameFilter === '' && commentFilter === '')
+        return showError('Indtast venligst mindst én frekvens, navn, eller kommentar');
+    if (!isNaN(from) && !isNaN(to) && from > to)
+        return showError('Fra frekvens må ikke være højere end Til frekvens');
+
+    const fromMHz = !isNaN(from) ? convertToMHz(from, unit) : 0;
+    const toMHz = !isNaN(to) ? convertToMHz(to, unit) : Infinity;
+
+    filteredData = allData.filter(e => {
+        const sStart = e[CONFIG.frequencyStartCol]; const sEnd = e[CONFIG.frequencyEndCol];
+        const rStart = e[CONFIG.receiverStartCol]; const rEnd = e[CONFIG.receiverEndCol];
+        if (sStart === undefined || sEnd === undefined || rStart === undefined || rEnd === undefined) return false;
+
+        const navne = String(e['Navn'] || '').toLowerCase();
+        const nameMatch = nameFilter === '' ||
+            (exactMatch ? new RegExp('(^|[^a-zæøå])' + nameFilter + '([^a-zæøå]|$)', 'i').test(navne) : navne.includes(nameFilter));
+        if (!nameMatch) return false;
+
+        const key = e.Navn + '|' + e.Downlink + '|' + e.Uplink;
+        const comment = commentMap[key] || '';
+        const commentMatch = commentFilter === '' || comment.toLowerCase().includes(commentFilter);
+        if (!commentMatch) return false;
+
+        if (isNaN(from) && isNaN(to)) return true;
+        if (isNaN(to)) return (sStart <= fromMHz && fromMHz <= sEnd) || (rStart <= fromMHz && fromMHz <= rEnd);
+        if (isNaN(from)) return (sStart <= toMHz && toMHz <= sEnd) || (rStart <= toMHz && toMHz <= rEnd);
+
+        const senderMatch = !(sEnd < fromMHz || sStart > toMHz);
+        const receiverMatch = !(rEnd < fromMHz || rStart > toMHz);
+        return senderMatch || receiverMatch;
+    });
+
+    const grouped = {};
+    filteredData.forEach(row => {
+        const key = JSON.stringify({ Navn: row.Navn, Downlink: row.Downlink, Uplink: row.Uplink });
+        if (!grouped[key]) grouped[key] = { ...row, Antal: 1 };
+        else grouped[key].Antal++;
+    });
+
+    filteredData = Object.values(grouped);
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('resultsCount').textContent = Object.keys(grouped).length + ' resultater';
+    document.getElementById('exportCommentsBtn').style.display = 'inline-block';
+    document.getElementById('importCommentsBtn').style.display = 'inline-block';
+    if (sortColumn) sortData(sortColumn); else renderTable();
+}
+
+function convertToMHz(value, unit) {
+    const map = { Hz: 1e-6, KHz: 1e-3, MHz: 1, GHz: 1000 };
+    return value * (map[unit] || 1);
+}
+
+function resetSearch() {
+    document.getElementById('fromFreq').value = '';
+    document.getElementById('toFreq').value = '';
+    document.getElementById('frequencyUnit').value = 'MHz';
+    document.getElementById('nameSearch').value = '';
+    const grouped = {};
+    allData.forEach(row => {
+        const key = JSON.stringify({ Navn: row.Navn, Downlink: row.Downlink, Uplink: row.Uplink });
+        if (!grouped[key]) grouped[key] = { ...row, Antal: 1 };
+        else grouped[key].Antal++;
+    });
+    filteredData = Object.values(grouped);
+    document.getElementById('resultsCount').textContent = Object.keys(grouped).length + ' poster';
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('exportCommentsBtn').style.display = 'inline-block';
+    document.getElementById('importCommentsBtn').style.display = 'inline-block';
+    if (sortColumn) sortData(sortColumn); else renderTable();
+}
+
+// ===== TABEL =====
+function renderTable() {
+    const header = document.getElementById('tableHeader');
+    const body = document.getElementById('tableBody');
+    header.innerHTML = ''; body.innerHTML = '';
+    if (filteredData.length === 0) {
+        document.getElementById('results').style.display = 'none';
+        document.getElementById('noResults').style.display = 'block';
+        return;
+    }
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('noResults').style.display = 'none';
+
+    const hRow = document.createElement('tr');
+    selectedColumns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = CONFIG.columnDisplayNames[col] || col;
+        th.style.cursor = 'pointer';
+        th.onclick = () => sortData(col);
+        const sortIndicator = document.createElement('span');
+        sortIndicator.style.marginLeft = '5px'; sortIndicator.style.fontSize = '0.8em';
+        if (sortColumn === col) sortIndicator.textContent = sortDirection === 'asc' ? '↑' : '↓';
+        th.appendChild(sortIndicator); hRow.appendChild(th);
+    });
+    header.appendChild(hRow);
+
+    filteredData.forEach(entry => {
+        const row = document.createElement('tr');
+        selectedColumns.forEach(col => {
+            const td = document.createElement('td');
+            let val = entry[col];
+            if (col === 'Downlink' || col === 'Uplink') val = formatFreqRange(val);
+            else if (col === 'Bandbredde') {
+                if (val === undefined || val === '' || val === 0 || val === null)
+                    val = calculateBandwidthFromDownlink(entry.Downlink);
+                val = formatFreqBandwidth(val);
+            }
+            if (col === 'Kommentar') {
+                const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
+                val = commentMap[key] || '';
+                td.contentEditable = true; td.style.minWidth = '150px';
+                td.style.backgroundColor = 'var(--background)';
+                td.onblur = function() {
+                    const comment = this.textContent;
+                    const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
+                    commentMap[key] = comment;
+                    localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+                };
+            }
+            td.textContent = val !== undefined ? val : ''; row.appendChild(td);
+        });
+        body.appendChild(row);
+    });
+}
+
+// ===== FORMATERING =====
+function formatFreq(mhz) {
+    if (mhz === 0) return '0 MHz';
+    const formatWithComma = (value, decimals) => value.toFixed(decimals).replace('.', ',');
+    if (mhz >= 1000) return formatWithComma(mhz / 1000, 3) + ' GHz';
+    if (mhz >= 1) return formatWithComma(mhz, 2) + ' MHz';
+    if (mhz >= 0.001) return formatWithComma(mhz * 1000, 3) + ' KHz';
+    return formatWithComma(mhz * 1000000, 0) + ' Hz';
+}
+
+function formatFreqBandwidth(mhz) {
+    if (mhz === 0) return '0 MHz';
+    const formatWithComma = (value, decimals) => value.toFixed(decimals).replace('.', ',');
+    if (mhz >= 1000) return formatWithComma(mhz / 1000, 1) + ' GHz';
+    if (mhz >= 1) return formatWithComma(mhz, 1) + ' MHz';
+    if (mhz >= 0.001) return formatWithComma(mhz * 1000, 1) + ' KHz';
+    return formatWithComma(mhz * 1000000, 0) + ' Hz';
+}
+
+function calculateBandwidthFromDownlink(downlinkStr) {
+    if (!downlinkStr || downlinkStr === '') return 0;
+    const parts = downlinkStr.split('-');
+    if (parts.length !== 2) return 0;
+    const start = parseFloat(parts[0].replace(',', '.'));
+    const end = parseFloat(parts[1].replace(',', '.'));
+    if (isNaN(start) || isNaN(end)) return 0;
+    return Math.abs(end - start);
+}
+
+function formatFreqRange(rangeStr) {
+    if (!rangeStr || rangeStr === '') return '';
+    const parts = rangeStr.split('-');
+    if (parts.length !== 2) return rangeStr;
+    const start = parseFloat(parts[0]); const end = parseFloat(parts[1]);
+    if (isNaN(start) || isNaN(end)) return rangeStr;
+    const startFormatted = formatFreq(start); const endFormatted = formatFreq(end);
+    const unitMatch = startFormatted.match(/\s*(MHz|GHz|KHz|Hz)$/);
+    const unit = unitMatch ? unitMatch[1] : 'MHz';
+    const startClean = startFormatted.replace(/\s*(MHz|GHz|KHz|Hz)$/, '');
+    const endClean = endFormatted.replace(/\s*(MHz|GHz|KHz|Hz)$/, '');
+    return startClean + '-' + endClean + ' ' + unit;
+}
+
+// ===== SORTERING =====
+function sortData(column) {
+    if (sortColumn === column) sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    else { sortColumn = column; sortDirection = 'asc'; }
+
+    filteredData.sort((a, b) => {
+        const valA = a[column]; const valB = b[column];
+        if (column === 'Kommentar') {
+            const keyA = a.Navn + '|' + a.Downlink + '|' + a.Uplink;
+            const keyB = b.Navn + '|' + b.Downlink + '|' + b.Uplink;
+            const commentA = commentMap[keyA] || ''; const commentB = commentMap[keyB] || '';
+            if (commentA === '' && commentB !== '') return 1;
+            if (commentA !== '' && commentB === '') return -1;
+            const strA = String(commentA).toLowerCase(); const strB = String(commentB).toLowerCase();
+            if (strA < strB) return sortDirection === 'asc' ? -1 : 1;
+            if (strA > strB) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        }
+        if (valA === undefined || valA === null) return 1;
+        if (valB === undefined || valB === null) return -1;
+        if (column === 'Downlink' || column === 'Uplink') {
+            const numA = extractFreqNumber(valA); const numB = extractFreqNumber(valB);
+            return sortDirection === 'asc' ? numA - numB : numB - numA;
+        }
+        if (typeof valA === 'number' && typeof valB === 'number')
+            return sortDirection === 'asc' ? valA - valB : valB - valA;
+        const strA = String(valA).toLowerCase(); const strB = String(valB).toLowerCase();
+        if (strA < strB) return sortDirection === 'asc' ? -1 : 1;
+        if (strA > strB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    renderTable();
+}
+
+function extractFreqNumber(freqStr) {
+    if (!freqStr || typeof freqStr !== 'string') return 0;
+    const match = freqStr.match(/([\d,]+)/);
+    if (!match) return 0;
+    return parseFloat(match[1].replace(',', '.')) || 0;
+}
+
+// ===== UTILITETS FUNKTIONER =====
+function showError(msg) {
+    const el = document.getElementById('error');
+    el.textContent = msg; el.style.display = 'block';
+    filteredData = []; renderTable();
+}
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleScrollToTop() {
+    const btn = document.getElementById('scrollToTop');
+    btn.style.display = window.scrollY > 300 ? 'block' : 'none';
+}
+
+// ===== EKSPORT/IMPORT =====
+function exportResults() {
+    if (!filteredData.length) return showError('Ingen resultater');
+    let csv = selectedColumns.map(c => CONFIG.columnDisplayNames[c] || c).join(';') + '\n';
+    csv += filteredData.map(entry => {
+        return selectedColumns.map(col => {
+            let val = entry[col];
+            if (col === CONFIG.frequencyStartCol || col === CONFIG.frequencyEndCol)
+                val = val !== undefined ? formatFreq(val) : '';
+            if (col === 'Bandbredde') val = val !== undefined ? formatFreqBandwidth(val) : '';
+            if (typeof val === 'string' && val.includes(';'))
+                val = '"' + val.replace(/\"/g, '""') + '"';
+            return val !== undefined ? val : '';
+        }).join(';');
+    }).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'frekvenser_eksport.csv'; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportComments() {
+    if (Object.keys(commentMap).length === 0) return showError('Ingen kommentarer at eksportere');
+    const json = JSON.stringify(commentMap, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'kommentarer.json'; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importComments() {
+    document.getElementById('commentsFileInput').click();
+}
+
+function handleCommentsFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const newComments = JSON.parse(e.target.result);
+            Object.assign(commentMap, newComments);
+            document.getElementById('importCommentsBtn').textContent = '✓ Kommentarer importeret';
+            setTimeout(() => {
+                document.getElementById('importCommentsBtn').textContent = '📥 Importer kommentarer';
+            }, 2000);
+            localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+            renderTable();
+        } catch(err) {
+            showError('Fejl ved import af kommentarer: Ugyldig JSON-fil');
+        }
+    };
+    reader.onerror = function() {
+        showError('Fejl ved indlæsning af kommentarfil');
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function exportWithComments() {
+    if (!allData.length) return showError('Ingen data');
+    const exportColumns = [...allHeaders];
+    if (!exportColumns.includes('Kommentar')) exportColumns.push('Kommentar');
+    let csv = exportColumns.map(c => CONFIG.columnDisplayNames[c] || c).join(';') + '\n';
+    csv += allData.map(entry => {
+        return exportColumns.map(col => {
+            let val = entry[col];
+            if (col === CONFIG.frequencyStartCol || col === CONFIG.frequencyEndCol)
+                val = val !== undefined ? formatFreq(val) : '';
+            if (col === 'Bandbredde') val = val !== undefined ? formatFreqBandwidth(val) : '';
+            if (col === 'Kommentar') {
+                const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
+                val = commentMap[key] || '';
+            }
+            if (typeof val === 'string' && val.includes(';'))
+                val = '"' + val.replace(/\"/g, '""') + '"';
+            return val !== undefined ? val : '';
+        }).join(';');
+    }).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'frekvenser_med_kommentarer.csv'; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ===== INITIALISERING =====
+window.onload = function() {
+    generateCheckboxes();
+    window.addEventListener('scroll', toggleScrollToTop);
+    window.addEventListener('beforeunload', function(e) {
+        if (Object.keys(commentMap).length > 0) {
+            localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+            e.preventDefault();
+            e.returnValue = 'Du har ugemte kommentarer. Er du sikker på, at du vil forlade siden?';
+            return e.returnValue;
+        }
+    });
+};
+</script>
+</body>
+</html>
