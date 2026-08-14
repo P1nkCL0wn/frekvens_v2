@@ -1,8 +1,9 @@
-const CACHE_NAME = 'frekvens-v4';
+const CACHE_NAME = 'frekvens-v5';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-192x192.png'  // ⭐ Tilføjet ikonet til cache
 ];
 
 // Installer og cache vigtige filer
@@ -17,8 +18,7 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   // Bypass cache for CSV-filer og filuploads
   if (event.request.url.includes('.csv') ||
-      event.request.method === 'POST' ||
-      event.request.headers.get('Range')) {
+      event.request.method === 'POST') {
     return fetch(event.request);
   }
 
