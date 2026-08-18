@@ -226,13 +226,20 @@ async function loadFromDB() {
 const DATA_URL = 'https://dl.dropbox.com/scl/fi/vhi0ewwruejiuhptqo56i/frekvenserDK.csv?rlkey=zkq1trspf7jycjgtnbuz2t3ys&dl=1';
 
 async function fetchCSV() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sekunders timeout
+
     try {
-        const response = await fetch(DATA_URL);
+        const response = await fetch(DATA_URL, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
         if (!response.ok) throw new Error('Kunne ikke hente CSV');
         const arrayBuffer = await response.arrayBuffer();
         const text = new TextDecoder('windows-1252').decode(new Uint8Array(arrayBuffer));
         return text;
     } catch (error) {
+        clearTimeout(timeoutId);
         throw new Error('Kunne ikke hente data fra Dropbox: ' + error.message);
     }
 }
