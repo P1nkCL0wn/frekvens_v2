@@ -179,6 +179,8 @@ let commentMap = {};
 let db;
 
 // ===== INDEXEDDB FUNKTIONER =====
+// VIGTIGT: openDB() har nu onblocked/onversionchange så et låst opstarts-Promise
+// ikke længere hænger uendeligt (den klassiske årsag til at "Indlæser data..." fryser fast).
 function openDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open('FrekvensDatabase', 1);
@@ -190,6 +192,10 @@ function openDB() {
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject('Fejl ved åbning af database');
+        // En anden fane/historisk tab holder en ældre version åben -> 'blocked'.
+        // Uden denne handler ville Promise'et hænge for evigt og appen blive ved
+        // med at vise "Indlæser data...".
+        request.onblocked = () => reject('Database opgradering blokeret af en anden fane. Luk andre faner af appen.');
     });
 }
 
@@ -206,6 +212,7 @@ async function saveToDB(data) {
             });
             transaction.oncomplete = () => resolve();
             transaction.onerror = () => reject('Fejl ved gemning i database');
+            transaction.onabort = () => reject('Gemning afbrudt i database');
         };
         clearRequest.onerror = reject;
     });
@@ -226,6 +233,10 @@ async function loadFromDB() {
 const DATA_URL = 'https://dl.dropbox.com/scl/fi/vhi0ewwruejiuhptqo56i/frekvenserDK.csv?rlkey=zkq1trspf7jycjgtnbuz2t3ys&dl=1';
 
 async function fetchCSV() {
+    // Hop over netværk hvis browseren ved den er offline -> ingen unødig ventetid.
+    if (!navigator.onLine) {
+        throw new Error('Offline');
+    }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -245,14 +256,44 @@ async function fetchCSV() {
 }
 
 // ===== DATALOADING =====
+// RÆKKEFØLGE ÆNDRET: Vi læser først fra IndexedDB. Først hvis lokal cache
+// mangler, forsøger vi Dropbox. Det gør offline-opstart øjeblikkelig i stedet
+// for at vente 5 sek på en fetch der alligevel fejler.
 async function loadInitialData() {
+    const statusEl = document.getElementById('status');
     try {
-        document.getElementById('status').textContent = 'Henter data fra Dropbox...';
+        // 1) Prøv lokal cache først - det er det der gør offline-opstart hurtig.
+        try {
+            statusEl.textContent = 'Indlæser lokal data...';
+            const savedData = await loadFromDB();
+            if (savedData && savedData.length > 0) {
+                allData = savedData;
+                filteredData = [...allData];
+                statusEl.textContent = 'Bruger lokal data.';
+                document.getElementById('resultsCount').textContent = allData.length + ' poster';
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('exportBtn').style.display = 'inline-block';
+                document.getElementById('exportCommentsBtn').style.display = 'inline-block';
+                document.getElementById('importCommentsBtn').style.display = 'inline-block';
+                renderTable();
+
+                // 2) I baggrunden: opdater fra Dropbox hvis vi er online (uden at blokke UI).
+                if (navigator.onLine) {
+                    refreshFromDropboxInBackground();
+                }
+                return;
+            }
+        } catch (dbError) {
+            console.warn('Kunne ikke læse lokal cache:', dbError);
+        }
+
+        // 3) Ingen lokal cache -> prøv Dropbox.
+        statusEl.textContent = 'Henter data fra Dropbox...';
         const csvText = await fetchCSV();
         parseCSV(csvText);
         await saveToDB(allData);
         filteredData = [...allData];
-        document.getElementById('status').textContent = 'Data hentet og gemt til offline brug!';
+        statusEl.textContent = 'Data hentet og gemt til offline brug!';
         document.getElementById('resultsCount').textContent = allData.length + ' poster';
         document.getElementById('results').style.display = 'block';
         document.getElementById('exportBtn').style.display = 'inline-block';
@@ -261,29 +302,27 @@ async function loadInitialData() {
         renderTable();
         showSuccess('Data klar til brug!');
     } catch (error) {
-        console.log('Prøver offline data...', error);
-        document.getElementById('status').textContent = 'Offline - henter cached data...';
-        try {
-            const savedData = await loadFromDB();
-            if (savedData.length > 0) {
-                allData = savedData;
-                filteredData = [...allData];
-                document.getElementById('resultsCount').textContent = allData.length + ' poster (offline)';
-                document.getElementById('status').textContent = 'Bruger offline data.';
-                document.getElementById('results').style.display = 'block';
-                document.getElementById('exportBtn').style.display = 'inline-block';
-                document.getElementById('exportCommentsBtn').style.display = 'inline-block';
-                document.getElementById('importCommentsBtn').style.display = 'inline-block';
-                renderTable();
-                showSuccess('Bruger cached data (offline)');
-            } else {
-                document.getElementById('status').textContent = 'Ingen data tilgængelig. Tilslut internet for at hente data første gang.';
-                showError('Ingen data tilgængelig. Tilslut internet for at hente data.');
-            }
-        } catch (dbError) {
-            document.getElementById('status').textContent = 'Ingen data tilgængelig.';
-            showError('Ingen data tilgængelig. Tilslut internet for at hente data.');
-        }
+        console.error('Indlæsning fejlede:', error);
+        statusEl.textContent = 'Ingen data tilgængelig. Tilslut internet for at hente data første gang.';
+        showError('Ingen data tilgængelig. Tilslut internet for at hente data.');
+    }
+}
+
+// Opdaterer data i baggrunden uden at blokere brugergrænsefladen.
+// Fejl her logger kun - de ødelægger ikke den allerede viste lokale data.
+async function refreshFromDropboxInBackground() {
+    try {
+        const csvText = await fetchCSV();
+        parseCSV(csvText);
+        await saveToDB(allData);
+        filteredData = [...allData];
+        document.getElementById('status').textContent = 'Data opdateret fra Dropbox.';
+        document.getElementById('resultsCount').textContent = allData.length + ' poster';
+        renderTable();
+    } catch (error) {
+        // Stil fejl - vi har stadig lokal data vist. Log kun, lad være med at
+        // overskrive en allerede fungerende brugergrænseflade med fejl.
+        console.log('Baggrundsopdatering sprunget over:', error.message);
     }
 }
 
@@ -327,6 +366,8 @@ function handleFileSelect(event) {
         saveToDB(allData).then(() => {
             document.getElementById('status').textContent = 'Lokal CSV indlæst og gemt!';
             showSuccess('Lokal CSV gemt til offline brug!');
+        }).catch(err => {
+            showError('Fejl ved gemning i database: ' + err);
         });
     };
     reader.onerror = function() {
@@ -776,12 +817,26 @@ function exportWithComments() {
 }
 
 // ===== INITIALISERING =====
-window.onload = async function() {
+window.addEventListener('DOMContentLoaded', async function() {
     generateCheckboxes();
     window.addEventListener('scroll', toggleScrollToTop);
 
-    // Start med at indlæse data
+    // Hent evt. gemte kommentarer så de er klar før første rendering.
+    try {
+        const saved = localStorage.getItem('frekvensComments');
+        if (saved) commentMap = JSON.parse(saved) || {};
+    } catch (e) {
+        console.warn('Kunne ikke læse kommentarer:', e);
+    }
+
+    // Start med at indlæse data (læser lokal cache først -> øjeblikkelig offline-opstart).
     await loadInitialData();
+
+    // Når forbindelsen vender tilbage efter offline, opdater i baggrunden.
+    window.addEventListener('online', function() {
+        if (allData.length > 0) refreshFromDropboxInBackground();
+        else loadInitialData();
+    });
 
     window.addEventListener('beforeunload', function(e) {
         if (Object.keys(commentMap).length > 0) {
@@ -791,7 +846,7 @@ window.onload = async function() {
             return e.returnValue;
         }
     });
-};
+});
 
 function scrollToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -800,6 +855,15 @@ function scrollToTop() {
 function toggleScrollToTop() {
     const btn = document.getElementById('scrollToTop');
     btn.style.display = window.scrollY > 300 ? 'block' : 'none';
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err =>
+            console.warn('SW-registrering fejlede:', err)
+        );
+    });
 }
 </script>
 </body>
