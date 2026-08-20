@@ -286,7 +286,7 @@ async function loadInitialData() {
         }
 
         // 3) Ingen lokal cache -> prøv Dropbox
-        statusEl.textContent = 'Henter data fra Dropbox...';
+        statusEl.textContent = 'Henter data fra internettet...';
         const csvText = await fetchCSV();
         parseCSV(csvText);
         await saveToDB(allData);
