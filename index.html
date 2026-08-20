@@ -589,9 +589,12 @@ function renderTable() {
             if (col === 'Downlink' || col === 'Uplink') val = formatFreqRange(val);
             else if (col === 'Bandbredde') {
                 if (val === undefined || val === '' || val === null || val === 0) {
-                    val = calculateBandwidthFromDownlink(entry.Downlink);
-                }
-                val = formatFreqBandwidth(val);
+                val = calculateBandwidthFromDownlink(entry.Downlink);
+                } else {
+                // Konverter streng til tal (f.eks. "15" → 15)
+                val = parseFloat(String(val).replace(',', '.')) || 0;
+    }
+    val = formatFreqBandwidth(val);
             }
             if (col === 'Kommentar') {
                 const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
