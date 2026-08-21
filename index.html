@@ -52,7 +52,7 @@ tr:hover{background:var(--background)}
     .search-section { grid-template-columns: 1fr !important; gap: 15px !important; }
     .frequency-input-group { grid-template-columns: 1fr !important; gap: 10px !important; }
     .form-group input, .form-group select { padding: 16px 18px !important; font-size: 1.2rem !important; width: 100% !important; }
-    .btn { padding: 16px 24px !important; font-size: 1.2rem !important; width: 100% !important; margin-bottom: 12px !important; display: block !important; }
+    .btn { padding: 12px 16px !important; font-size: 1rem !important; width: 100% !important; margin-bottom: 12px !important; display: block !important; }
     .table-container { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; margin: 15px 0 !important; }
     table { min-width: 700px !important; font-size: 1.1rem !important; width: 100% !important; }
     th, td { padding: 14px 16px !important; font-size: 1.1rem !important; }
@@ -113,9 +113,9 @@ tr:hover{background:var(--background)}
 <label>Kommentar</label>
 <input type="text" id="commentSearch" placeholder="Søg i kommentarer..." onkeydown="if(event.key==='Enter')search()">
 </div>
-<div class="form-group" style="align-self:end">
-<label>&nbsp;</label>
-<div class="checkbox-item" style="padding:0">
+<div class="form-group">
+<label>Hele ord</label>
+<div class="checkbox-item">
 <input type="checkbox" id="exactMatch" onchange="exactMatch=this.checked">
 <label for="exactMatch" style="cursor:pointer;font-size:0.85rem">Hele ord</label>
 </div>
