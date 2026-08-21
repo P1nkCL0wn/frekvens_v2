@@ -552,7 +552,7 @@ function search() {
     document.getElementById('exportCommentsBtn').style.display = 'inline-block';
     document.getElementById('importCommentsBtn').style.display = 'inline-block';
     if (sortColumn) sortData(sortColumn); else renderTable();
-}
+    }
 
 function convertToMHz(value, unit) {
     const map = { Hz: 1e-6, KHz: 1e-3, MHz: 1, GHz: 1000 };
@@ -576,7 +576,7 @@ function resetSearch() {
     document.getElementById('exportCommentsBtn').style.display = 'inline-block';
     document.getElementById('importCommentsBtn').style.display = 'inline-block';
     if (sortColumn) sortData(sortColumn); else renderTable();
-}
+    }
 
 // ===== TABEL =====
 function renderTable() {
@@ -590,6 +590,14 @@ function renderTable() {
     }
     document.getElementById('results').style.display = 'block';
     document.getElementById('noResults').style.display = 'none';
+    
+    // Scroll til resultater
+    setTimeout(() => {
+        const resultsCount = document.getElementById('resultsCount');
+        if (resultsCount) {
+            resultsCount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 50);
 
     const hRow = document.createElement('tr');
     selectedColumns.forEach(col => {
@@ -870,6 +878,8 @@ window.addEventListener('DOMContentLoaded', async function() {
 function scrollToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+
 
 function toggleScrollToTop() {
     const btn = document.getElementById('scrollToTop');
