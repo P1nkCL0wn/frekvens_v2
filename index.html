@@ -166,13 +166,13 @@ const CONFIG = {
     receiverStartCol: 'ReceiverFreqStartFloat',
     receiverEndCol: 'ReceiverFreqEndFloat',
     defaultColumns: ['Navn', 'Downlink', 'Uplink', 'Antal', 'Kommentar'],
-    optionalColumns: ['Bandbredde', 'Tilladelsestype', 'Anvedelsesomrade', 'Adresse', 'Postnummer', 'Bynavn', 'Antennehojde', 'Sendeeffekt'],
+    optionalColumns: ['BandbreddeDownlink', 'BandbreddeUplink', 'Tilladelsestype', 'Anvedelsesomrade', 'Adresse', 'Postnummer', 'Bynavn', 'Antennehojde', 'Sendeeffekt'],
     columnDisplayNames: {
         'Downlink': 'Downlink', 'Uplink': 'Uplink', 'Navn': 'Navn', 'Antal': 'Antal',
         'Tilladelsestype': 'Tilladelsestype', 'Anvedelsesomrade': 'Anvendelsesområde',
         'Adresse': 'Adresse', 'Postnummer': 'Postnummer', 'Bynavn': 'By',
         'Antennehojde': 'Antenne Højde', 'Sendeeffekt': 'Sendeeffekt',
-        'Bandbredde': 'Båndbredde', 'Kommentar': 'Kommentar'
+        'BandbreddeDownlink': 'B\u00e5ndbredde Downlink', 'BandbreddeUplink': 'B\u00e5ndbredde Uplink', 'Kommentar': 'Kommentar'
     }
 };
 
@@ -587,14 +587,13 @@ function renderTable() {
             const td = document.createElement('td');
             let val = entry[col];
             if (col === 'Downlink' || col === 'Uplink') val = formatFreqRange(val);
-            else if (col === 'Bandbredde') {
-                if (val === undefined || val === '' || val === null || val === 0) {
-                val = calculateBandwidthFromDownlink(entry.Downlink);
-                } else {
-                // Konverter streng til tal (f.eks. "15" → 15)
-                val = parseFloat(String(val).replace(',', '.')) || 0;
-    }
-    val = formatFreqBandwidth(val);
+            else if (col === 'BandbreddeDownlink') {
+                val = calculateBandwidthFromFreqRange(entry.Downlink);
+                val = formatFreqBandwidth(val);
+            }
+            else if (col === 'BandbreddeUplink') {
+                val = calculateBandwidthFromFreqRange(entry.Uplink);
+                val = formatFreqBandwidth(val);
             }
             if (col === 'Kommentar') {
                 const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
@@ -633,9 +632,10 @@ function formatFreqBandwidth(mhz) {
     return formatWithComma(mhz * 1000000, 0) + ' Hz';
 }
 
-function calculateBandwidthFromDownlink(downlinkStr) {
-    if (!downlinkStr || downlinkStr === '') return 0;
-    const parts = downlinkStr.split('-');
+
+function calculateBandwidthFromFreqRange(freqRangeStr) {
+    if (!freqRangeStr || freqRangeStr === '') return 0;
+    const parts = freqRangeStr.split('-');
     if (parts.length !== 2) return 0;
     const start = parseFloat(parts[0].replace(',', '.'));
     const end = parseFloat(parts[1].replace(',', '.'));
@@ -734,7 +734,8 @@ function exportResults() {
             let val = entry[col];
             if (col === CONFIG.frequencyStartCol || col === CONFIG.frequencyEndCol)
                 val = val !== undefined ? formatFreq(val) : '';
-            if (col === 'Bandbredde') val = val !== undefined ? formatFreqBandwidth(val) : '';
+            if (col === 'BandbreddeDownlink') val = formatFreqBandwidth(calculateBandwidthFromFreqRange(entry.Downlink));
+            if (col === 'BandbreddeUplink') val = formatFreqBandwidth(calculateBandwidthFromFreqRange(entry.Uplink));
             if (typeof val === 'string' && val.includes(';'))
                 val = '"' + val.replace(/\"/g, '""') + '"';
             return val !== undefined ? val : '';
@@ -796,7 +797,8 @@ function exportWithComments() {
             let val = entry[col];
             if (col === CONFIG.frequencyStartCol || col === CONFIG.frequencyEndCol)
                 val = val !== undefined ? formatFreq(val) : '';
-            if (col === 'Bandbredde') val = val !== undefined ? formatFreqBandwidth(val) : '';
+            if (col === 'BandbreddeDownlink') val = formatFreqBandwidth(calculateBandwidthFromFreqRange(entry.Downlink));
+            if (col === 'BandbreddeUplink') val = formatFreqBandwidth(calculateBandwidthFromFreqRange(entry.Uplink));
             if (col === 'Kommentar') {
                 const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
                 val = commentMap[key] || '';
