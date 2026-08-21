@@ -126,9 +126,11 @@ tr:hover{background:var(--background)}
 <button class="btn btn-secondary" onclick="resetSearch()" style="flex:1">🔄 Nulstil</button>
 </div>
 <div style="margin-top:25px">
-<h3 style="color:var(--secondary);margin-bottom:10px">Vælg ekstra kolonner</h3>
-<button class="toggle-all" onclick="toggleAllColumns()"><span id="toggleText">✓ Vælg alle</span></button>
-<div class="checkbox-group" id="columnCheckboxes"></div>
+<h3 style="color:var(--secondary);margin-bottom:10px;cursor:pointer;" onclick="toggleColumnSelection()">
+  Vælg ekstra kolonner <span id="columnToggleIcon">▶</span>
+</h3>
+<button class="toggle-all" onclick="toggleAllColumns()" style="display:none;" id="toggleAllBtn"><span id="toggleText">✓ Vælg alle</span></button>
+<div class="checkbox-group" id="columnCheckboxes" style="display:none;"></div>
 </div>
 </div>
 <div class="card">
@@ -443,6 +445,25 @@ function parseLine(line, sep) {
 }
 
 // ===== CHECKBOXES =====
+
+function toggleColumnSelection() {
+    const checkboxesContainer = document.getElementById('columnCheckboxes');
+    const toggleAllBtn = document.getElementById('toggleAllBtn');
+    const icon = document.getElementById('columnToggleIcon');
+    
+    const isHidden = checkboxesContainer.style.display === 'none';
+    
+    if (isHidden) {
+        checkboxesContainer.style.display = 'grid';
+        toggleAllBtn.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        checkboxesContainer.style.display = 'none';
+        toggleAllBtn.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
 function generateCheckboxes() {
     const container = document.getElementById('columnCheckboxes');
     CONFIG.optionalColumns.forEach(col => {
