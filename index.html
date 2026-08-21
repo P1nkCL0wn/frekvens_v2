@@ -258,7 +258,7 @@ async function fetchCSV() {
         return text;
     } catch (error) {
         clearTimeout(timeoutId);
-        throw new Error('Kunne ikke hente data fra Dropbox: ' + error.message);
+        throw new Error('Kunne ikke hente data fra internettet: ' + error.message);
     }
 }
 
@@ -289,7 +289,7 @@ async function loadInitialData() {
             console.warn('Kunne ikke læse lokal cache:', dbError);
         }
 
-        // 3) Ingen lokal cache -> prøv Dropbox
+        // 3) Ingen lokal cache -> prøv at ppdatere data
         statusEl.textContent = 'Henter data fra internettet...';
         const csvText = await fetchCSV();
         parseCSV(csvText);
@@ -316,7 +316,7 @@ async function refreshFromDropboxInBackground() {
         parseCSV(csvText);
         await saveToDB(allData);
         filteredData = [...allData];
-        document.getElementById('status').textContent = 'Data opdateret fra Dropbox.';
+        document.getElementById('status').textContent = 'Data opdateret fra internettet.';
         document.getElementById('resultsCount').textContent = allData.length + ' poster';
         renderTable();
     } catch (error) {
@@ -326,7 +326,7 @@ async function refreshFromDropboxInBackground() {
 
 async function updateData() {
     try {
-        document.getElementById('status').textContent = 'Opdaterer data fra Dropbox...';
+        document.getElementById('status').textContent = 'Opdaterer data fra internettet...';
         const csvText = await fetchCSV();
         parseCSV(csvText);
         await saveToDB(allData);
