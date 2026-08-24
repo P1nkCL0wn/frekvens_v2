@@ -553,6 +553,13 @@ function search() {
     document.getElementById('exportCommentsBtn').style.display = 'inline-block';
     document.getElementById('importCommentsBtn').style.display = 'inline-block';
     if (sortColumn) sortData(sortColumn); else renderTable();
+    // Scroll til resultater efter søgning
+    setTimeout(() => {
+        const resultsCount = document.getElementById('resultsCount');
+        if (resultsCount) {
+            resultsCount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 50);
     }
 
 function convertToMHz(value, unit) {
@@ -577,6 +584,13 @@ function resetSearch() {
     document.getElementById('exportCommentsBtn').style.display = 'inline-block';
     document.getElementById('importCommentsBtn').style.display = 'inline-block';
     if (sortColumn) sortData(sortColumn); else renderTable();
+    // Scroll til resultater efter søgning
+    setTimeout(() => {
+        const resultsCount = document.getElementById('resultsCount');
+        if (resultsCount) {
+            resultsCount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 50);
     }
 
 // ===== TABEL =====
@@ -592,14 +606,6 @@ function renderTable() {
     document.getElementById('results').style.display = 'block';
     document.getElementById('noResults').style.display = 'none';
     
-    // Scroll til resultater
-    setTimeout(() => {
-        const resultsCount = document.getElementById('resultsCount');
-        if (resultsCount) {
-            resultsCount.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, 50);
-
     const hRow = document.createElement('tr');
     selectedColumns.forEach(col => {
         const th = document.createElement('th');
