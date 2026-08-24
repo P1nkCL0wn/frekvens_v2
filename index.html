@@ -107,14 +107,14 @@ tr:hover{background:var(--background)}
 </div>
 </div>
 <div class="search-section">
+<div style="display:grid;grid-template-columns:1fr auto;gap:15px">
 <div class="form-group">
-<div style="display:flex;justify-content:space-between;align-items:center">
 <label>Navn</label>
-<label for="exactMatch" style="cursor:pointer;font-size:0.85rem;font-weight:600;color:var(--secondary)">Eksakt match</label>
+<input type="text" id="nameSearch" placeholder="Søg på navn..." onkeydown="if(event.key==='Enter')search()">
 </div>
-<div style="display:flex;align-items:center;gap:10px">
-<input type="text" id="nameSearch" placeholder="Søg på navn..." onkeydown="if(event.key==='Enter')search()" style="flex:1">
-<div class="checkbox-item" style="margin:0;padding:0;background:none">
+<div class="form-group" style="align-self:end">
+<label>Eksakt match</label>
+<div class="checkbox-item">
 <input type="checkbox" id="exactMatch" onchange="exactMatch=this.checked">
 </div>
 </div>
