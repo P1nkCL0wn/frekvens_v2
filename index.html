@@ -639,7 +639,10 @@ function renderTable() {
                     localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
                 };
             }
-            td.textContent = val !== undefined ? val : ''; row.appendChild(td);
+            if (col === 'Navn' && (val === undefined || val === '' || val.trim() === '')) {
+    val = 'Anonym i frekvensregistret';
+}
+td.textContent = val !== undefined ? val : ''; row.appendChild(td);
         });
         body.appendChild(row);
     });
