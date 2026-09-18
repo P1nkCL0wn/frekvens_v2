@@ -140,7 +140,7 @@ tr:hover{background:var(--background)}
 <h2 style="color:var(--primary);margin-bottom:15px">Resultater</h2>
 <div class="results-info">
 <span class="results-count" id="resultsCount">Indlæser...</span>
-<button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display:none">📥 Eksporter</button>
+<button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display:none">📥 Eksporter resultater</button>
 <button class="btn btn-secondary" onclick="exportComments()" id="exportCommentsBtn" style="display:none">📝 Eksporter kommentarer</button>
 <button class="btn btn-secondary" onclick="importComments()" id="importCommentsBtn" style="display:none">📥 Importer kommentarer</button>
 <input type="file" id="commentsFileInput" accept=".json" style="display:none" onchange="handleCommentsFileSelect(event)">
@@ -769,14 +769,20 @@ function hideSuccess() {
 // ===== EKSPORT/IMPORT =====
 function exportResults() {
     if (!filteredData.length) return showError('Ingen resultater');
-    let csv = selectedColumns.map(c => CONFIG.columnDisplayNames[c] || c).join(';') + '\n';
+    let exportColumns = [...selectedColumns];
+    if (!exportColumns.includes('Kommentar')) exportColumns.push('Kommentar');
+    let csv = exportColumns.map(c => CONFIG.columnDisplayNames[c] || c).join(';') + '\n';
     csv += filteredData.map(entry => {
-        return selectedColumns.map(col => {
+        return exportColumns.map(col => {
             let val = entry[col];
             if (col === CONFIG.frequencyStartCol || col === CONFIG.frequencyEndCol)
                 val = val !== undefined ? formatFreq(val) : '';
             if (col === 'BandbreddeDownlink') val = formatFreqBandwidth(calculateBandwidthFromFreqRange(entry.Downlink));
             if (col === 'BandbreddeUplink') val = formatFreqBandwidth(calculateBandwidthFromFreqRange(entry.Uplink));
+            if (col === 'Kommentar') {
+                const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
+                val = commentMap[key] || '';
+            }
             if (typeof val === 'string' && val.includes(';'))
                 val = '"' + val.replace(/\"/g, '""') + '"';
             return val !== undefined ? val : '';
