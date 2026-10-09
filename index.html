@@ -141,9 +141,16 @@ tr:hover{background:var(--background)}
 <div class="results-info">
 <span class="results-count" id="resultsCount">Indlæser...</span>
 <button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display:none">📥 Eksporter resultater</button>
-<button class="btn btn-secondary" onclick="exportComments()" id="exportCommentsBtn" style="display:none">📝 Eksporter kommentarer</button>
-<button class="btn btn-secondary" onclick="importComments()" id="importCommentsBtn" style="display:none">📥 Importer kommentarer</button>
-<input type="file" id="commentsFileInput" accept=".json" style="display:none" onchange="handleCommentsFileSelect(event)">
+</div>
+<div style="margin:15px 0;padding:15px;background:#f0f9ff;border-radius:8px">
+<h3 style="color:var(--primary);margin-bottom:10px">Pi Synkronisering</h3>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<input type="text" id="piAddress" placeholder="http://100.103.237.56:5000" value="http://100.103.237.56:5000" style="flex:1;min-width:200px">
+<button class="btn" onclick="saveCommentsToPi()">💾 Gem til Pi</button>
+<button class="btn" onclick="loadCommentsFromPi()">📥 Hent fra Pi</button>
+<button class="btn btn-secondary" onclick="syncWithPi()">↻↺ Synkroniser</button>
+</div>
+<span id="piStatus" style="font-size:0.85rem;color:var(--secondary);margin-top:5px;display:block"></span>
 </div>
 <div id="loading" class="loading" style="display:none"></div>
 <div id="results" style="display:none">
@@ -278,8 +285,6 @@ async function loadInitialData() {
                 document.getElementById('resultsCount').textContent = allData.length + ' poster';
                 document.getElementById('results').style.display = 'block';
                 document.getElementById('exportBtn').style.display = 'inline-block';
-                document.getElementById('exportCommentsBtn').style.display = 'inline-block';
-                document.getElementById('importCommentsBtn').style.display = 'inline-block';
                 renderTable();
                 if (navigator.onLine) {
                     refreshFromDropboxInBackground();
@@ -300,8 +305,7 @@ async function loadInitialData() {
         document.getElementById('resultsCount').textContent = allData.length + ' poster';
         document.getElementById('results').style.display = 'block';
         document.getElementById('exportBtn').style.display = 'inline-block';
-        document.getElementById('exportCommentsBtn').style.display = 'inline-block';
-        document.getElementById('importCommentsBtn').style.display = 'inline-block';
+        document.getElementById('exportBtn').style.display = 'inline-block';
         renderTable();
         showSuccess('Data klar til brug!');
     } catch (error) {
@@ -431,8 +435,6 @@ function parseCSV(text) {
     document.getElementById('results').style.display = 'block';
     document.getElementById('resultsCount').textContent = Object.keys(grouped).length + ' poster';
     document.getElementById('exportBtn').style.display = 'inline-block';
-    document.getElementById('exportCommentsBtn').style.display = 'inline-block';
-    document.getElementById('importCommentsBtn').style.display = 'inline-block';
     renderTable();
 }
 
@@ -550,8 +552,7 @@ function search() {
     filteredData = Object.values(grouped);
     hideError();
     document.getElementById('resultsCount').textContent = Object.keys(grouped).length + ' resultater';
-    document.getElementById('exportCommentsBtn').style.display = 'inline-block';
-    document.getElementById('importCommentsBtn').style.display = 'inline-block';
+    document.getElementById('exportBtn').style.display = 'inline-block';
     if (sortColumn) sortData(sortColumn); else renderTable();
     // Scroll til resultater efter søgning
     setTimeout(() => {
@@ -581,8 +582,7 @@ function resetSearch() {
     filteredData = Object.values(grouped);
     hideError();
     document.getElementById('resultsCount').textContent = Object.keys(grouped).length + ' poster';
-    document.getElementById('exportCommentsBtn').style.display = 'inline-block';
-    document.getElementById('importCommentsBtn').style.display = 'inline-block';
+    document.getElementById('exportBtn').style.display = 'inline-block';
     if (sortColumn) sortData(sortColumn); else renderTable();
     // Scroll til resultater efter søgning
     setTimeout(() => {
@@ -795,43 +795,41 @@ function exportResults() {
     URL.revokeObjectURL(url);
 }
 
-function exportComments() {
-    if (Object.keys(commentMap).length === 0) return showError('Ingen kommentarer at eksportere');
-    const json = JSON.stringify(commentMap, null, 2);
-    const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'kommentarer.json'; a.click();
-    URL.revokeObjectURL(url);
+function saveCommentsToPi() {
+    const piUrl = document.getElementById('piAddress').value;
+    const statusEl = document.getElementById('piStatus');
+    statusEl.textContent = 'Gemmer...';
+    fetch(piUrl + '/save_comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(commentMap)
+    }).then(r => r.json()).then(() => {
+        statusEl.textContent = '✓ Gemt til Pi!';
+        localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+        setTimeout(() => statusEl.textContent = '', 3000);
+    }).catch(err => {
+        statusEl.textContent = '✗ Fejl: ' + err.message;
+    });
 }
 
-function importComments() {
-    document.getElementById('commentsFileInput').click();
+function loadCommentsFromPi() {
+    const piUrl = document.getElementById('piAddress').value;
+    const statusEl = document.getElementById('piStatus');
+    statusEl.textContent = 'Henter...';
+    fetch(piUrl + '/load_comments').then(r => r.json()).then(data => {
+        commentMap = data || {};
+        localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+        statusEl.textContent = '✓ Hentet fra Pi!';
+        renderTable();
+        setTimeout(() => statusEl.textContent = '', 3000);
+    }).catch(err => {
+        statusEl.textContent = '✗ Fejl: ' + err.message;
+    });
 }
 
-function handleCommentsFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const newComments = JSON.parse(e.target.result);
-            Object.assign(commentMap, newComments);
-            document.getElementById('importCommentsBtn').textContent = '✓ Kommentarer importeret';
-            setTimeout(() => {
-                document.getElementById('importCommentsBtn').textContent = '📥 Importer kommentarer';
-            }, 2000);
-            localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
-            renderTable();
-        } catch(err) {
-            showError('Fejl ved import af kommentarer: Ugyldig JSON-fil');
-        }
-    };
-    reader.onerror = function() {
-        showError('Fejl ved indlæsning af kommentarfil');
-    };
-    reader.readAsText(file);
-    event.target.value = '';
+function syncWithPi() {
+    saveCommentsToPi();
+    setTimeout(loadCommentsFromPi, 1000);
 }
 
 function exportWithComments() {
