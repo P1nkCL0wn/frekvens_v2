@@ -816,7 +816,13 @@ function loadCommentsFromPi() {
     const piUrl = document.getElementById('piAddress').value;
     const statusEl = document.getElementById('piStatus');
     statusEl.textContent = 'Henter...';
-    fetch(piUrl + '/load_comments').then(r => r.json()).then(data => {
+    fetch(piUrl + '/load_comments', {
+        mode: 'cors',
+        headers: { 'Content-Type': 'application/json' }
+    }).then(r => {
+        if (!r.ok) throw new Error('Serverfejl: ' + r.status);
+        return r.json();
+    }).then(data => {
         commentMap = data || {};
         localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
         statusEl.textContent = '✓ Hentet fra Pi!';
