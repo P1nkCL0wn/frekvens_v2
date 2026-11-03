@@ -40,7 +40,6 @@ tr:hover{background:var(--background)}
 .error{background:#f8fafc;color:#dc2626;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #fecaca;display:none}
 .success{background:#f8fafc;color:#166534;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #bbf7d0;display:none}
 .toggle-all{background:none;border:none;color:var(--primary);cursor:pointer;font-size:0.9rem;padding:5px 0}
-
 /* RESPONSIV DESIGN */
 @media screen and (max-width: 414px) {
     body { padding: 12px !important; }
@@ -86,7 +85,6 @@ tr:hover{background:var(--background)}
     <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleFileSelect(event)">
 </div>
 <span id="status" style="color:var(--secondary);font-size:0.9rem;display:block;margin-bottom:15px;">Indlæser data...</span>
-
 <h2 style="color:var(--primary);margin:20px 0">Søgning</h2>
 <div class="search-section">
 <div class="form-group">
@@ -143,14 +141,12 @@ tr:hover{background:var(--background)}
 <button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display:none">📥 Eksporter resultater</button>
 </div>
 <div style="margin:15px 0;padding:15px;background:#f0f9ff;border-radius:8px">
-<h3 style="color:var(--primary);margin-bottom:10px">Pi Synkronisering</h3>
+<h3 style="color:var(--primary);margin-bottom:10px">Fil Synkronisering</h3>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
-<input type="text" id="piAddress" placeholder="https://raspberrypi.tailf73db8.ts.net:8000" value="https://raspberrypi.tailf73db8.ts.net:8000" style="flex:1;min-width:200px">
-<button class="btn" onclick="saveCommentsToPi()">💾 Gem til Pi</button>
-<button class="btn" onclick="loadCommentsFromPi()">📥 Hent fra Pi</button>
-<button class="btn btn-secondary" onclick="syncWithPi()">↻↺ Synkroniser</button>
+<button class="btn" onclick="saveCommentsToFile()">💾 Gem til fil</button>
+<button class="btn" onclick="loadCommentsFromFile()">📥 Hent fra fil</button>
 </div>
-<span id="piStatus" style="font-size:0.85rem;color:var(--secondary);margin-top:5px;display:block"></span>
+<span id="fileStatus" style="font-size:0.85rem;color:var(--secondary);margin-top:5px;display:block"></span>
 </div>
 <div id="loading" class="loading" style="display:none"></div>
 <div id="results" style="display:none">
@@ -160,7 +156,6 @@ tr:hover{background:var(--background)}
 </div>
 </div>
 <button id="scrollToTop" style="display:none;position:fixed;bottom:20px;right:20px;width:50px;height:50px;border-radius:50%;background:var(--primary);color:white;border:none;font-size:24px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.2);z-index:1000" onclick="scrollToTop()">↑</button>
-
 <script>
 // ===== SERVICE WORKER REGISTRERING =====
 if ('serviceWorker' in navigator) {
@@ -170,7 +165,6 @@ if ('serviceWorker' in navigator) {
         );
     });
 }
-
 // ===== KONFIGURATION =====
 const CONFIG = {
     frequencyStartCol: 'SenderFreqStartFloat',
@@ -187,7 +181,6 @@ const CONFIG = {
         'BandbreddeDownlink': 'B\u00e5ndbredde Downlink', 'BandbreddeUplink': 'B\u00e5ndbredde Uplink', 'Kommentar': 'Kommentar'
     }
 };
-
 // ===== GLOBALE VARIABLE =====
 let allData = [];
 let filteredData = [];
@@ -198,7 +191,6 @@ let exactMatch = false;
 let allHeaders = [];
 let commentMap = {};
 let db;
-
 // ===== INDEXEDDB FUNKTIONER =====
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -214,7 +206,6 @@ function openDB() {
         request.onblocked = () => reject('Database opgradering blokeret af en anden fane. Luk andre faner af appen.');
     });
 }
-
 async function saveToDB(data) {
     db = await openDB();
     return new Promise((resolve, reject) => {
@@ -233,7 +224,6 @@ async function saveToDB(data) {
         clearRequest.onerror = reject;
     });
 }
-
 async function loadFromDB() {
     db = await openDB();
     return new Promise((resolve, reject) => {
@@ -244,17 +234,14 @@ async function loadFromDB() {
         request.onerror = () => reject('Fejl ved indlæsning fra database');
     });
 }
-
 // ===== DROPBOX FUNKTIONER =====
 const DATA_URL = 'https://dl.dropbox.com/scl/fi/vhi0ewwruejiuhptqo56i/frekvenserDK.csv?rlkey=62m97d3hiqe8w1o2ou257i9vo&st=tsr5fl8c&e=1&dl=1';
-
 async function fetchCSV() {
     if (!navigator.onLine) {
         throw new Error('Offline');
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-
     try {
         const response = await fetch(DATA_URL, {
             signal: controller.signal
@@ -269,7 +256,6 @@ async function fetchCSV() {
         throw new Error('Kunne ikke hente data fra internettet: ' + error.message);
     }
 }
-
 // ===== DATALOADING =====
 async function loadInitialData() {
     const statusEl = document.getElementById('status');
@@ -294,7 +280,6 @@ async function loadInitialData() {
         } catch (dbError) {
             console.warn('Kunne ikke læse lokal cache:', dbError);
         }
-
         // 3) Ingen lokal cache -> prøv at ppdatere data
         statusEl.textContent = 'Henter data fra internettet...';
         const csvText = await fetchCSV();
@@ -314,7 +299,6 @@ async function loadInitialData() {
         showError('Ingen data tilgængelig. Tilslut internet for at hente data.');
     }
 }
-
 async function refreshFromDropboxInBackground() {
     try {
         const csvText = await fetchCSV();
@@ -328,7 +312,6 @@ async function refreshFromDropboxInBackground() {
         console.log('Baggrundsopdatering sprunget over:', error.message);
     }
 }
-
 async function updateData() {
     try {
         document.getElementById('status').textContent = 'Opdaterer data fra internettet...';
@@ -345,12 +328,10 @@ async function updateData() {
         showError('Kunne ikke opdatere data. Tjek internetforbindelse: ' + error.message);
     }
 }
-
 // ===== FIL HÅNDTERING =====
 function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     document.getElementById('status').textContent = 'Indlæser: ' + file.name + '...';
     document.getElementById('resultsCount').textContent = 'Indlæser...';
     document.getElementById('loading').style.display = 'block';
@@ -358,7 +339,6 @@ function handleFileSelect(event) {
     document.getElementById('noResults').style.display = 'none';
     hideError();
     hideSuccess();
-
     const reader = new FileReader();
     reader.onload = function(e) {
         const arrayBuffer = e.target.result;
@@ -377,16 +357,13 @@ function handleFileSelect(event) {
     };
     reader.readAsArrayBuffer(file);
 }
-
 // ===== PARSECSV =====
 function parseCSV(text) {
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) return showError('CSV-filen er tom');
-
     const separator = lines[0].includes(';') ? ';' : ',';
     const headers = parseLine(lines[0], separator);
     allHeaders = headers.map(h => h.trim());
-
     allData = lines.slice(1).map(line => {
         const values = parseLine(line, separator);
         const entry = {};
@@ -409,7 +386,6 @@ function parseCSV(text) {
                 }
             }
         });
-
         if (entry[CONFIG.frequencyStartCol] !== undefined && entry[CONFIG.frequencyEndCol] !== undefined) {
             const start = Math.round(entry[CONFIG.frequencyStartCol] * 1000) / 1000;
             const end = Math.round(entry[CONFIG.frequencyEndCol] * 1000) / 1000;
@@ -422,14 +398,12 @@ function parseCSV(text) {
         }
         return entry;
     });
-
     const grouped = {};
     allData.forEach(row => {
         const key = JSON.stringify({ Navn: row.Navn, Downlink: row.Downlink, Uplink: row.Uplink });
         if (!grouped[key]) grouped[key] = { ...row, Antal: 1 };
         else grouped[key].Antal++;
     });
-
     filteredData = Object.values(grouped);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('results').style.display = 'block';
@@ -437,7 +411,6 @@ function parseCSV(text) {
     document.getElementById('exportBtn').style.display = 'inline-block';
     renderTable();
 }
-
 function parseLine(line, sep) {
     const values = []; let current = ''; let inQuotes = false;
     for (const char of line) {
@@ -448,16 +421,12 @@ function parseLine(line, sep) {
     values.push(current);
     return values;
 }
-
 // ===== CHECKBOXES =====
-
 function toggleColumnSelection() {
     const checkboxesContainer = document.getElementById('columnCheckboxes');
     const toggleAllBtn = document.getElementById('toggleAllBtn');
     const icon = document.getElementById('columnToggleIcon');
-    
     const isHidden = checkboxesContainer.style.display === 'none';
-    
     if (isHidden) {
         checkboxesContainer.style.display = 'grid';
         toggleAllBtn.style.display = 'block';
@@ -468,7 +437,6 @@ function toggleColumnSelection() {
         icon.textContent = '▶';
     }
 }
-
 function generateCheckboxes() {
     const container = document.getElementById('columnCheckboxes');
     CONFIG.optionalColumns.forEach(col => {
@@ -482,7 +450,6 @@ function generateCheckboxes() {
         div.appendChild(input); div.appendChild(labelEl); container.appendChild(div);
     });
 }
-
 function updateColumns() {
     const fixedColumns = ['Navn', 'Downlink', 'Uplink', 'Antal', 'Kommentar'];
     selectedColumns = [...fixedColumns];
@@ -492,7 +459,6 @@ function updateColumns() {
     });
     renderTable();
 }
-
 function toggleAllColumns() {
     const checkboxes = document.querySelectorAll('#columnCheckboxes input');
     const allChecked = Array.from(checkboxes).every(c => c.checked);
@@ -500,7 +466,6 @@ function toggleAllColumns() {
     document.getElementById('toggleText').textContent = allChecked ? '✓ Vælg alle' : '✗ Fravælg alle';
     updateColumns();
 }
-
 // ===== SØGNING =====
 function search() {
     const fromVal = document.getElementById('fromFreq').value.replace(',', '.');
@@ -509,46 +474,37 @@ function search() {
     const unit = document.getElementById('frequencyUnit').value;
     const nameFilter = document.getElementById('nameSearch').value.toLowerCase();
     const commentFilter = document.getElementById('commentSearch').value.toLowerCase();
-
     if (isNaN(from) && isNaN(to) && nameFilter === '' && commentFilter === '')
         return showError('Indtast venligst mindst én frekvens, navn, eller kommentar');
     if (!isNaN(from) && !isNaN(to) && from > to)
         return showError('Fra frekvens må ikke være højere end Til frekvens');
-
     const fromMHz = !isNaN(from) ? convertToMHz(from, unit) : 0;
     const toMHz = !isNaN(to) ? convertToMHz(to, unit) : Infinity;
-
     filteredData = allData.filter(e => {
         const sStart = e[CONFIG.frequencyStartCol]; const sEnd = e[CONFIG.frequencyEndCol];
         const rStart = e[CONFIG.receiverStartCol]; const rEnd = e[CONFIG.receiverEndCol];
         if (sStart === undefined || sEnd === undefined || rStart === undefined || rEnd === undefined) return false;
-
         const navne = String(e['Navn'] || '').toLowerCase();
         const nameMatch = nameFilter === '' ||
             (exactMatch ? new RegExp('(^|[^a-zæøå])' + nameFilter + '([^a-zæøå]|$)', 'i').test(navne) : navne.includes(nameFilter));
         if (!nameMatch) return false;
-
         const key = e.Navn + '|' + e.Downlink + '|' + e.Uplink;
         const comment = commentMap[key] || '';
         const commentMatch = commentFilter === '' || comment.toLowerCase().includes(commentFilter);
         if (!commentMatch) return false;
-
         if (isNaN(from) && isNaN(to)) return true;
         if (isNaN(to)) return (sStart <= fromMHz && fromMHz <= sEnd) || (rStart <= fromMHz && fromMHz <= rEnd);
         if (isNaN(from)) return (sStart <= toMHz && toMHz <= sEnd) || (rStart <= toMHz && toMHz <= rEnd);
-
         const senderMatch = !(sEnd < fromMHz || sStart > toMHz);
         const receiverMatch = !(rEnd < fromMHz || rStart > toMHz);
         return senderMatch || receiverMatch;
     });
-
     const grouped = {};
     filteredData.forEach(row => {
         const key = JSON.stringify({ Navn: row.Navn, Downlink: row.Downlink, Uplink: row.Uplink });
         if (!grouped[key]) grouped[key] = { ...row, Antal: 1 };
         else grouped[key].Antal++;
     });
-
     filteredData = Object.values(grouped);
     hideError();
     document.getElementById('resultsCount').textContent = Object.keys(grouped).length + ' resultater';
@@ -562,12 +518,10 @@ function search() {
         }
     }, 50);
     }
-
 function convertToMHz(value, unit) {
     const map = { Hz: 1e-6, KHz: 1e-3, MHz: 1, GHz: 1000 };
     return value * (map[unit] || 1);
 }
-
 function resetSearch() {
     document.getElementById('fromFreq').value = '';
     document.getElementById('toFreq').value = '';
@@ -592,7 +546,6 @@ function resetSearch() {
         }
     }, 50);
     }
-
 // ===== TABEL =====
 function renderTable() {
     const header = document.getElementById('tableHeader');
@@ -605,7 +558,6 @@ function renderTable() {
     }
     document.getElementById('results').style.display = 'block';
     document.getElementById('noResults').style.display = 'none';
-    
     const hRow = document.createElement('tr');
     selectedColumns.forEach(col => {
         const th = document.createElement('th');
@@ -618,7 +570,6 @@ function renderTable() {
         th.appendChild(sortIndicator); hRow.appendChild(th);
     });
     header.appendChild(hRow);
-
     filteredData.forEach(entry => {
         const row = document.createElement('tr');
         selectedColumns.forEach(col => {
@@ -653,7 +604,6 @@ td.textContent = val !== undefined ? val : ''; row.appendChild(td);
         body.appendChild(row);
     });
 }
-
 // ===== FORMATERING =====
 function formatFreq(mhz) {
     if (mhz === 0 || mhz === '' || mhz === null || mhz === undefined) return '0 MHz';
@@ -663,7 +613,6 @@ function formatFreq(mhz) {
     if (mhz >= 0.001) return formatWithComma(mhz * 1000, 3) + ' KHz';
     return formatWithComma(mhz * 1000000, 0) + ' Hz';
 }
-
 function formatFreqBandwidth(mhz) {
     if (mhz === 0 || mhz === '' || mhz === null || mhz === undefined) return '0 MHz';
     const formatWithComma = (value, decimals) => value.toFixed(decimals).replace('.', ',');
@@ -672,8 +621,6 @@ function formatFreqBandwidth(mhz) {
     if (mhz >= 0.001) return formatWithComma(mhz * 1000, 1) + ' KHz';
     return formatWithComma(mhz * 1000000, 0) + ' Hz';
 }
-
-
 function calculateBandwidthFromFreqRange(freqRangeStr) {
     if (!freqRangeStr || freqRangeStr === '') return 0;
     const parts = freqRangeStr.split('-');
@@ -683,7 +630,6 @@ function calculateBandwidthFromFreqRange(freqRangeStr) {
     if (isNaN(start) || isNaN(end)) return 0;
     return Math.abs(end - start);
 }
-
 function formatFreqRange(rangeStr) {
     if (!rangeStr || rangeStr === '') return '';
     const parts = rangeStr.split('-');
@@ -697,12 +643,10 @@ function formatFreqRange(rangeStr) {
     const endClean = endFormatted.replace(/\s*(MHz|GHz|KHz|Hz)$/, '');
     return startClean + '-' + endClean + ' ' + unit;
 }
-
 // ===== SORTERING =====
 function sortData(column) {
     if (sortColumn === column) sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     else { sortColumn = column; sortDirection = 'asc'; }
-
     filteredData.sort((a, b) => {
         const valA = a[column]; const valB = b[column];
         if (column === 'Kommentar') {
@@ -731,14 +675,12 @@ function sortData(column) {
     });
     renderTable();
 }
-
 function extractFreqNumber(freqStr) {
     if (!freqStr || typeof freqStr !== 'string') return 0;
     const match = freqStr.match(/([\d,]+)/);
     if (!match) return 0;
     return parseFloat(match[1].replace(',', '.')) || 0;
 }
-
 // ===== UTILITETS FUNKTIONER =====
 function showError(msg) {
     const el = document.getElementById('error');
@@ -748,11 +690,9 @@ function showError(msg) {
     el.style.color = '#dc2626';
     el.style.borderColor = '#fecaca';
 }
-
 function hideError() {
     document.getElementById('error').style.display = 'none';
 }
-
 function showSuccess(msg) {
     const el = document.getElementById('success');
     el.textContent = msg;
@@ -761,11 +701,9 @@ function showSuccess(msg) {
         el.style.display = 'none';
     }, 5000);
 }
-
 function hideSuccess() {
     document.getElementById('success').style.display = 'none';
 }
-
 // ===== EKSPORT/IMPORT =====
 function exportResults() {
     if (!filteredData.length) return showError('Ingen resultater');
@@ -794,48 +732,51 @@ function exportResults() {
     a.href = url; a.download = 'frekvenser_eksport.csv'; a.click();
     URL.revokeObjectURL(url);
 }
-
-function saveCommentsToPi() {
-    const piUrl = document.getElementById('piAddress').value;
-    const statusEl = document.getElementById('piStatus');
+function saveCommentsToFile() {
+    const statusEl = document.getElementById('fileStatus');
     statusEl.textContent = 'Gemmer...';
-    fetch(piUrl + '/save_comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(commentMap)
-    }).then(r => r.json()).then(() => {
-        statusEl.textContent = '✓ Gemt til Pi!';
-        localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+    const commentJson = JSON.stringify(commentMap, null, 2);
+    localStorage.setItem('frekvensComments', commentJson);
+    try {
+        const blob = new Blob([commentJson], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'frekvens_kommentarer.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        statusEl.textContent = '\u2713 Gemt til fil!';
         setTimeout(() => statusEl.textContent = '', 3000);
-    }).catch(err => {
-        statusEl.textContent = '✗ Fejl: ' + err.message;
-    });
+    } catch (err) {
+        statusEl.textContent = '\u2717 Fejl: ' + err.message;
+        setTimeout(() => statusEl.textContent = '', 3000);
+    }
 }
-
-function loadCommentsFromPi() {
-    const piUrl = document.getElementById('piAddress').value;
-    const statusEl = document.getElementById('piStatus');
+function loadCommentsFromFile() {
+    const statusEl = document.getElementById('fileStatus');
     statusEl.textContent = 'Henter...';
-    fetch(piUrl + '/load_comments')
-        .then(r => {
-        if (!r.ok) throw new Error('Serverfejl: ' + r.status);
-        return r.json();
-    }).then(data => {
-        commentMap = data || {};
-        localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
-        statusEl.textContent = '✓ Hentet fra Pi!';
-        renderTable();
-        setTimeout(() => statusEl.textContent = '', 3000);
-    }).catch(err => {
-        statusEl.textContent = '✗ Fejl: ' + err.message;
-    });
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const text = await file.text();
+                commentMap = JSON.parse(text) || {};
+                localStorage.setItem('frekvensComments', text);
+                statusEl.textContent = '\u2713 Hentet fra fil!';
+                renderTable();
+                setTimeout(() => statusEl.textContent = '', 3000);
+            } catch (err) {
+                statusEl.textContent = '\u2717 Fejl: ' + err.message;
+                setTimeout(() => statusEl.textContent = '', 3000);
+            }
+        }
+    };
+    input.click();
 }
-
-function syncWithPi() {
-    saveCommentsToPi();
-    setTimeout(loadCommentsFromPi, 1000);
 }
-
 function exportWithComments() {
     if (!allData.length) return showError('Ingen data');
     const exportColumns = [...allHeaders];
@@ -863,26 +804,21 @@ function exportWithComments() {
     a.href = url; a.download = 'frekvenser_med_kommentarer.csv'; a.click();
     URL.revokeObjectURL(url);
 }
-
 // ===== INITIALISERING =====
 window.addEventListener('DOMContentLoaded', async function() {
     generateCheckboxes();
     window.addEventListener('scroll', toggleScrollToTop);
-
     try {
         const saved = localStorage.getItem('frekvensComments');
         if (saved) commentMap = JSON.parse(saved) || {};
     } catch (e) {
         console.warn('Kunne ikke læse kommentarer:', e);
     }
-
     await loadInitialData();
-
     window.addEventListener('online', function() {
         if (allData.length > 0) refreshFromDropboxInBackground();
         else loadInitialData();
     });
-
     window.addEventListener('beforeunload', function(e) {
         if (Object.keys(commentMap).length > 0) {
             localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
@@ -892,13 +828,9 @@ window.addEventListener('DOMContentLoaded', async function() {
         }
     });
 });
-
 function scrollToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
-
-
 function toggleScrollToTop() {
     const btn = document.getElementById('scrollToTop');
     btn.style.display = window.scrollY > 300 ? 'block' : 'none';
