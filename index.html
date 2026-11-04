@@ -742,7 +742,7 @@ function saveCommentsToFile() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'frekvens_kommentarer.json';
+        a.download = 'kommentarer.json';
         a.click();
         URL.revokeObjectURL(url);
         statusEl.textContent = '✓ Gemt til fil!';
@@ -888,7 +888,7 @@ function disableComments() {
 <div id="commentsSetupModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center">
   <div style="background:white;padding:30px;border-radius:12px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
     <h2 style="color:var(--primary);margin-bottom:20px">Kommentarer Opsætning</h2>
-    <p style="margin-bottom:20px;color:var(--text)">For at bruge kommentarer skal du angive hvor filen <code>frekvens_kommentarer.json</code> ligger på din enhed (synkroniseret med Nextcloud).</p>
+    <p style="margin-bottom:20px;color:var(--text)">For at bruge kommentarer skal du angive hvor filen <code>kommentarer.json</code> ligger på din enhed (synkroniseret med Nextcloud).</p>
     <div style="display:flex;gap:10px;margin-top:20px">
               <input type="file" id="commentsFileInput" accept=".json" style="display:none">
               <button class="btn" onclick="document.getElementById('commentsFileInput').click()" style="flex:1">Vælg fil</button>
