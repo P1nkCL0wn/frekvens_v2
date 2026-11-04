@@ -745,12 +745,13 @@ function saveCommentsToFile() {
         a.download = 'frekvens_kommentarer.json';
         a.click();
         URL.revokeObjectURL(url);
-        statusEl.textContent = '\u2713 Gemt til fil!';
+        statusEl.textContent = '✓ Gemt til fil!';
         setTimeout(() => statusEl.textContent = '', 3000);
     } catch (err) {
-        statusEl.textContent = '\u2717 Fejl: ' + err.message;
+        statusEl.textContent = '✗ Fejl: ' + err.message;
         setTimeout(() => statusEl.textContent = '', 3000);
     }
+}
 }
 function loadCommentsFromFile() {
     const statusEl = document.getElementById('fileStatus');
@@ -765,13 +766,17 @@ function loadCommentsFromFile() {
                 const text = await file.text();
                 commentMap = JSON.parse(text) || {};
                 localStorage.setItem('frekvensComments', text);
-                statusEl.textContent = '\u2713 Hentet fra fil!';
+                statusEl.textContent = '✓ Hentet fra fil!';
                 renderTable();
                 setTimeout(() => statusEl.textContent = '', 3000);
             } catch (err) {
-                statusEl.textContent = '\u2717 Fejl: ' + err.message;
+                statusEl.textContent = '✗ Fejl: ' + err.message;
                 setTimeout(() => statusEl.textContent = '', 3000);
             }
+        }
+    };
+    input.click();
+}
         }
     };
     input.click();
@@ -854,15 +859,22 @@ function toggleScrollToTop() {
 }
 
 function setCommentsPath() {
-    const path = document.getElementById('commentsFilePath').value;
-    if (path) {
-        localStorage.setItem('commentsFilePath', path);
-        localStorage.setItem('commentsEnabled', 'true');
-        document.getElementById('commentsSetupModal').style.display = 'none';
-        updateCommentsUI();
+    const fileInput = document.getElementById('commentsFileInput');
+    const file = fileInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            localStorage.setItem('commentsFileContent', e.target.result);
+            localStorage.setItem('commentsFileName', file.name);
+            localStorage.setItem('commentsEnabled', 'true');
+            document.getElementById('commentsSetupModal').style.display = 'none';
+            updateCommentsUI();
+        };
+        reader.readAsText(file);
     } else {
-        alert('Angiv venligst en sti!');
+        alert('Vælg venligst en fil!');
     }
+}
 }
 
 function disableComments() {
@@ -878,7 +890,9 @@ function disableComments() {
     <h2 style="color:var(--primary);margin-bottom:20px">Kommentarer Opsætning</h2>
     <p style="margin-bottom:20px;color:var(--text)">For at bruge kommentarer skal du angive hvor filen <code>frekvens_kommentarer.json</code> ligger på din enhed (synkroniseret med Nextcloud).</p>
     <div style="display:flex;gap:10px;margin-top:20px">
-      <input type="text" id="commentsFilePath" placeholder="/Nextcloud/Frekvenser/kommentarer.json" style="flex:1;padding:10px;border:2px solid var(--border);border-radius:8px">
+              <input type="file" id="commentsFileInput" accept=".json" style="display:none">
+              <button class="btn" onclick="document.getElementById('commentsFileInput').click()" style="flex:1">Vælg fil</button>
+              <span id="selectedFileName" style="font-size:0.9rem;color:var(--secondary);margin-left:10px"></span>
       <button class="btn" onclick="setCommentsPath()">Gem</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:15px">
