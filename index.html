@@ -814,13 +814,13 @@ window.addEventListener('DOMContentLoaded', async function() {    // Kommentarer
     const commentsPath = localStorage.getItem('commentsFilePath');
     
     // Vis modal hvis ikke opsat
-    if (!commentsPath && commentsEnabled) {
+    if (!localStorage.getItem('commentsFileContent')) {
         document.getElementById('commentsSetupModal').style.display = 'flex';
     }
     
     // Skjul kommentar-knapper hvis deaktiviseret
     function updateCommentsUI() {
-        const enabled = localStorage.getItem('commentsEnabled') !== 'false';
+        const enabled = !!localStorage.getItem('commentsFileContent');
         const fileBtn = document.querySelector('button[onclick="saveCommentsToFile()"]');
         const loadBtn = document.querySelector('button[onclick="loadCommentsFromFile()"]');
         if (fileBtn) fileBtn.style.display = enabled ? '' : 'none';
@@ -865,7 +865,7 @@ function setCommentsPath() {
         const reader = new FileReader();
         reader.onload = function(e) {
             localStorage.setItem('commentsFileContent', e.target.result);
-            localStorage.setItem('commentsFileName', file.name);
+
             localStorage.setItem('commentsEnabled', 'true');
             document.getElementById('commentsSetupModal').style.display = 'none';
             updateCommentsUI();
@@ -878,7 +878,7 @@ function setCommentsPath() {
 }
 
 function disableComments() {
-    localStorage.setItem('commentsEnabled', 'false');
+    localStorage.removeItem('commentsFileContent');
     document.getElementById('commentsSetupModal').style.display = 'none';
     updateCommentsUI();
 }
