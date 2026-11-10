@@ -486,7 +486,7 @@ function search() {
         if (sStart === undefined || sEnd === undefined || rStart === undefined || rEnd === undefined) return false;
         const navne = String(e['Navn'] || '').toLowerCase();
         const nameMatch = nameFilter === '' ||
-            (exactMatch ? new RegExp('(^|[^a-zæøå])' + nameFilter + '([^a-zæøå]|$)', 'i').test(navne) : navne.includes(nameFilter));
+            (exactMatch ? new RegExp('(^|[^a-zæøå])' + nameFilter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-zæøå]|$)', 'i').test(navne) : navne.includes(nameFilter));
         if (!nameMatch) return false;
         const key = e.Navn + '|' + e.Downlink + '|' + e.Uplink;
         const comment = commentMap[key] || '';
@@ -752,7 +752,6 @@ function saveCommentsToFile() {
         setTimeout(() => statusEl.textContent = '', 3000);
     }
 }
-}
 function loadCommentsFromFile() {
     const statusEl = document.getElementById('fileStatus');
     statusEl.textContent = 'Henter...';
@@ -773,10 +772,6 @@ function loadCommentsFromFile() {
                 statusEl.textContent = '✗ Fejl: ' + err.message;
                 setTimeout(() => statusEl.textContent = '', 3000);
             }
-        }
-    };
-    input.click();
-}
         }
     };
     input.click();
@@ -809,6 +804,13 @@ function exportWithComments() {
     URL.revokeObjectURL(url);
 }
 // ===== INITIALISERING =====
+function updateCommentsUI() {
+    const enabled = !!localStorage.getItem('commentsFileContent');
+    const fileBtn = document.querySelector('button[onclick="saveCommentsToFile()"]');
+    const loadBtn = document.querySelector('button[onclick="loadCommentsFromFile()"]');
+    if (fileBtn) fileBtn.style.display = enabled ? '' : 'none';
+    if (loadBtn) loadBtn.style.display = enabled ? '' : 'none';
+}
 window.addEventListener('DOMContentLoaded', async function() {    // Kommentarer opsætning
     const commentsEnabled = localStorage.getItem('commentsEnabled') !== 'false';
     const commentsPath = localStorage.getItem('commentsFilePath');
@@ -818,14 +820,6 @@ window.addEventListener('DOMContentLoaded', async function() {    // Kommentarer
         document.getElementById('commentsSetupModal').style.display = 'flex';
     }
     
-    // Skjul kommentar-knapper hvis deaktiviseret
-    function updateCommentsUI() {
-        const enabled = !!localStorage.getItem('commentsFileContent');
-        const fileBtn = document.querySelector('button[onclick="saveCommentsToFile()"]');
-        const loadBtn = document.querySelector('button[onclick="loadCommentsFromFile()"]');
-        if (fileBtn) fileBtn.style.display = enabled ? '' : 'none';
-        if (loadBtn) loadBtn.style.display = enabled ? '' : 'none';
-    }
     updateCommentsUI();
 
     generateCheckboxes();
@@ -874,7 +868,6 @@ function setCommentsPath() {
     } else {
         alert('Vælg venligst en fil!');
     }
-}
 }
 
 function disableComments() {
