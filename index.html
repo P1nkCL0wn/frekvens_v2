@@ -117,7 +117,7 @@ tr:hover{background:var(--background)}
 </div>
 </div>
 </div>
-<div class="form-group">
+<div class="form-group" id="commentSearchGroup">
 <label>Kommentar</label>
 <input type="text" id="commentSearch" placeholder="Søg i kommentarer..." onkeydown="if(event.key==='Enter')search()">
 </div>
@@ -183,6 +183,9 @@ let exactMatch = false;
 let allHeaders = [];
 let commentMap = {};
 let db;
+let commentsEnabled = false;
+let webdavConfig = null;
+let commentsDirty = false;
 // ===== INDEXEDDB FUNKTIONER =====
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -443,13 +446,14 @@ function generateCheckboxes() {
     });
 }
 function updateColumns() {
-    const fixedColumns = ['Navn', 'Downlink', 'Uplink', 'Antal', 'Kommentar'];
+    const fixedColumns = ['Navn', 'Downlink', 'Uplink', 'Antal'];
+    if (commentsEnabled) fixedColumns.push('Kommentar');
     selectedColumns = [...fixedColumns];
     CONFIG.optionalColumns.forEach(col => {
         const cb = document.getElementById('col-' + col);
         if (cb && cb.checked) selectedColumns.push(col);
     });
-    renderTable();
+    if (allData.length > 0) renderTable();
 }
 function toggleAllColumns() {
     const checkboxes = document.querySelectorAll('#columnCheckboxes input');
@@ -465,7 +469,7 @@ function search() {
     const from = parseFloat(fromVal); const to = parseFloat(toVal);
     const unit = document.getElementById('frequencyUnit').value;
     const nameFilter = document.getElementById('nameSearch').value.toLowerCase();
-    const commentFilter = document.getElementById('commentSearch').value.toLowerCase();
+    const commentFilter = commentsEnabled ? document.getElementById('commentSearch').value.toLowerCase() : '';
     if (isNaN(from) && isNaN(to) && nameFilter === '' && commentFilter === '')
         return showError('Indtast venligst mindst én frekvens, navn, eller kommentar');
     if (!isNaN(from) && !isNaN(to) && from > to)
@@ -579,14 +583,17 @@ function renderTable() {
             if (col === 'Kommentar') {
                 const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
                 val = commentMap[key] || '';
-                td.contentEditable = true; td.style.minWidth = '150px';
-                td.style.backgroundColor = 'var(--background)';
-                td.onblur = function() {
-                    const comment = this.textContent;
-                    const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
-                    commentMap[key] = comment;
-                    localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
-                };
+                if (commentsEnabled) {
+                    td.contentEditable = true; td.style.minWidth = '150px';
+                    td.style.backgroundColor = 'var(--background)';
+                    td.onblur = function() {
+                        const comment = this.textContent;
+                        const key = entry.Navn + '|' + entry.Downlink + '|' + entry.Uplink;
+                        commentMap[key] = comment;
+                        localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+                        saveCommentsToWebDAV();
+                    };
+                }
             }
             if (col === 'Navn' && (val === undefined || val === '' || val.trim() === '')) {
     val = 'Anonym i frekvensregistret';
@@ -700,7 +707,7 @@ function hideSuccess() {
 function exportResults() {
     if (!filteredData.length) return showError('Ingen resultater');
     let exportColumns = [...selectedColumns];
-    if (!exportColumns.includes('Kommentar')) exportColumns.push('Kommentar');
+    if (commentsEnabled && !exportColumns.includes('Kommentar')) exportColumns.push('Kommentar');
     let csv = exportColumns.map(c => CONFIG.columnDisplayNames[c] || c).join(';') + '\n';
     csv += filteredData.map(entry => {
         return exportColumns.map(col => {
@@ -724,61 +731,10 @@ function exportResults() {
     a.href = url; a.download = 'frekvenser_eksport.csv'; a.click();
     URL.revokeObjectURL(url);
 }
-function saveCommentsToFile() {
-    const statusEl = document.getElementById('fileStatus');
-    statusEl.textContent = 'Gemmer...';
-    const commentJson = JSON.stringify(commentMap, null, 2);
-    localStorage.setItem('frekvensComments', commentJson);
-    try {
-        const blob = new Blob([commentJson], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'kommentarer.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        statusEl.textContent = '✓ Gemt til fil!';
-        setTimeout(() => statusEl.textContent = '', 3000);
-    } catch (err) {
-        statusEl.textContent = '✗ Fejl: ' + err.message;
-        setTimeout(() => statusEl.textContent = '', 3000);
-    }
-}
-function loadCommentsFromFile() {
-    const statusEl = document.getElementById('fileStatus');
-    statusEl.textContent = 'Henter...';
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = async function() {
-                try {
-                    const text = reader.result;
-                    commentMap = JSON.parse(text) || {};
-                    localStorage.setItem('frekvensComments', text);
-                    statusEl.textContent = '✓ Hentet fra fil!';
-                    renderTable();
-                    setTimeout(() => statusEl.textContent = '', 3000);
-                } catch (err) {
-                    statusEl.textContent = '✗ Fejl: ' + err.message;
-                    setTimeout(() => statusEl.textContent = '', 3000);
-                }
-            };
-            reader.onerror = function() {
-                statusEl.textContent = '✗ Kunne ikke læse filen. Sørg for at den er downloadet lokalt (ikke kun i iCloud).';
-                setTimeout(() => statusEl.textContent = '', 5000);
-            };
-            reader.readAsText(file);
-        }
-    };
-    input.click();
-}
 function exportWithComments() {
     if (!allData.length) return showError('Ingen data');
     const exportColumns = [...allHeaders];
-    if (!exportColumns.includes('Kommentar')) exportColumns.push('Kommentar');
+    if (commentsEnabled && !exportColumns.includes('Kommentar')) exportColumns.push('Kommentar');
     let csv = exportColumns.map(c => CONFIG.columnDisplayNames[c] || c).join(';') + '\n';
     csv += allData.map(entry => {
         return exportColumns.map(col => {
@@ -804,23 +760,73 @@ function exportWithComments() {
 }
 // ===== INITIALISERING =====
 function updateCommentsUI() {
-    const enabled = !!localStorage.getItem('commentsFileContent');
-    const fileBtn = document.querySelector('button[onclick="saveCommentsToFile()"]');
-    const loadBtn = document.querySelector('button[onclick="loadCommentsFromFile()"]');
-    if (fileBtn) fileBtn.style.display = enabled ? '' : 'none';
-    if (loadBtn) loadBtn.style.display = enabled ? '' : 'none';
+    const group = document.getElementById('commentSearchGroup');
+    if (group) group.style.display = commentsEnabled ? '' : 'none';
+    updateColumns();
 }
-window.addEventListener('DOMContentLoaded', async function() {    // Kommentarer opsætning
-    const commentsEnabled = localStorage.getItem('commentsEnabled') !== 'false';
-    const commentsPath = localStorage.getItem('commentsFilePath');
-    
-    // Vis modal hvis ikke opsat
-    if (!localStorage.getItem('commentsFileContent')) {
+function webdavFileUrl() {
+    if (!webdavConfig) return null;
+    const base = webdavConfig.url.replace(/\/+$/, '');
+    const path = (webdavConfig.path || 'kommentarer.json').replace(/^\/+/, '');
+    return base + '/remote.php/dav/files/' + encodeURIComponent(webdavConfig.user) + '/' + path.split('/').map(encodeURIComponent).join('/');
+}
+function webdavAuth() {
+    return 'Basic ' + btoa(webdavConfig.user + ':' + webdavConfig.password);
+}
+async function loadCommentsFromWebDAV() {
+    const url = webdavFileUrl();
+    if (!url) return;
+    try {
+        const response = await fetch(url, { headers: { 'Authorization': webdavAuth() } });
+        if (response.status === 404) return;
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const text = await response.text();
+        commentMap = JSON.parse(text) || {};
+        localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
+        commentsDirty = false;
+        renderTable();
+    } catch (err) {
+        console.warn('Kunne ikke hente kommentarer fra Nextcloud (bruger lokal kopi):', err.message);
+    }
+}
+async function saveCommentsToWebDAV() {
+    const url = webdavFileUrl();
+    if (!url || !commentsEnabled) return;
+    if (!navigator.onLine) { commentsDirty = true; return; }
+    try {
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': webdavAuth(),
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify(commentMap, null, 2)
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        commentsDirty = false;
+    } catch (err) {
+        console.warn('Kunne ikke gemme kommentarer til Nextcloud (gemt lokalt, prøver igen ved næste online):', err.message);
+        commentsDirty = true;
+    }
+}
+function syncCommentsIfNeeded() {
+    if (commentsEnabled && webdavConfig && commentsDirty) saveCommentsToWebDAV();
+}
+window.addEventListener('DOMContentLoaded', async function() {
+    commentsEnabled = localStorage.getItem('commentsEnabled') === 'true';
+    try {
+        webdavConfig = JSON.parse(localStorage.getItem('webdavConfig') || 'null');
+    } catch (e) {
+        webdavConfig = null;
+    }
+    if (commentsEnabled && !webdavConfig) commentsEnabled = false;
+
+    // Vis modal hvis kommentarer aldrig er opsat eller afvist
+    if (!webdavConfig && localStorage.getItem('commentsEnabled') !== 'false') {
         document.getElementById('commentsSetupModal').style.display = 'flex';
     }
-    
-    updateCommentsUI();
 
+    updateCommentsUI();
     generateCheckboxes();
     window.addEventListener('scroll', toggleScrollToTop);
     try {
@@ -830,16 +836,17 @@ window.addEventListener('DOMContentLoaded', async function() {    // Kommentarer
         console.warn('Kunne ikke læse kommentarer:', e);
     }
     await loadInitialData();
+    if (commentsEnabled && webdavConfig && navigator.onLine) {
+        loadCommentsFromWebDAV();
+    }
     window.addEventListener('online', function() {
         if (allData.length > 0) refreshFromDropboxInBackground();
         else loadInitialData();
+        syncCommentsIfNeeded();
     });
     window.addEventListener('beforeunload', function(e) {
-        if (Object.keys(commentMap).length > 0) {
+        if (commentsEnabled && Object.keys(commentMap).length > 0) {
             localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
-            e.preventDefault();
-            e.returnValue = 'Du har ugemte kommentarer. Er du sikker på, at du vil forlade siden?';
-            return e.returnValue;
         }
     });
 });
@@ -851,41 +858,35 @@ function toggleScrollToTop() {
     btn.style.display = window.scrollY > 300 ? 'block' : 'none';
 }
 
-function setCommentsPath() {
-    const fileInput = document.getElementById('commentsFileInput');
-    const file = fileInput.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                JSON.parse(e.target.result);
-            } catch (err) {
-                alert('Filen er ikke gyldig JSON: ' + err.message);
-                return;
-            }
-            try {
-                localStorage.setItem('commentsFileContent', e.target.result);
-            } catch (err) {
-                alert('Kunne ikke gemme filen lokalt (for stor eller blokeret lager): ' + err.message);
-                return;
-            }
-            localStorage.setItem('commentsEnabled', 'true');
-            document.getElementById('commentsSetupModal').style.display = 'none';
-            updateCommentsUI();
-        };
-        reader.onerror = function() {
-            alert('Kunne ikke læse filen. Sørg for at kommentarer.json er downloadet lokalt på iPad\'en (ikke kun i iCloud).');
-        };
-        reader.readAsText(file);
-    } else {
-        alert('Vælg venligst en fil!');
+async function saveWebdavConfig() {
+    const url = document.getElementById('ncUrl').value.trim().replace(/\/+$/, '');
+    const user = document.getElementById('ncUser').value.trim();
+    const password = document.getElementById('ncPassword').value;
+    const path = document.getElementById('ncPath').value.trim() || 'kommentarer.json';
+    if (!url || !user || !password) {
+        alert('Udfyld venligst Nextcloud-URL, brugernavn og app-password.');
+        return;
     }
+    if (!/^https:\/\//i.test(url)) {
+        alert('URL skal starte med https://');
+        return;
+    }
+    webdavConfig = { url, user, password, path };
+    localStorage.setItem('webdavConfig', JSON.stringify(webdavConfig));
+    localStorage.setItem('commentsEnabled', 'true');
+    commentsEnabled = true;
+    document.getElementById('commentsSetupModal').style.display = 'none';
+    updateCommentsUI();
+    await loadCommentsFromWebDAV();
+    renderTable();
 }
 
 function disableComments() {
-    localStorage.removeItem('commentsFileContent');
+    localStorage.setItem('commentsEnabled', 'false');
+    commentsEnabled = false;
     document.getElementById('commentsSetupModal').style.display = 'none';
     updateCommentsUI();
+    renderTable();
 }
 
 </script>
@@ -893,12 +894,13 @@ function disableComments() {
 <div id="commentsSetupModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center">
   <div style="background:white;padding:30px;border-radius:12px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
     <h2 style="color:var(--primary);margin-bottom:20px">Kommentarer Opsætning</h2>
-    <p style="margin-bottom:20px;color:var(--text)">For at bruge kommentarer skal du angive hvor filen <code>kommentarer.json</code> ligger på din enhed (synkroniseret med Nextcloud).</p>
+    <p style="margin-bottom:20px;color:var(--text)">Kommentarer gemmes direkte i <code>kommentarer.json</code> på din Nextcloud via WebDAV. Opret et app-password i Nextcloud under Indstillinger &rarr; Sikkerhed.</p>
+    <div class="form-group" style="margin-bottom:12px"><label>Nextcloud URL</label><input type="url" id="ncUrl" placeholder="https://cloud.eksempel.dk"></div>
+    <div class="form-group" style="margin-bottom:12px"><label>Brugernavn</label><input type="text" id="ncUser" autocomplete="username" placeholder="dit brugernavn"></div>
+    <div class="form-group" style="margin-bottom:12px"><label>App-password</label><input type="password" id="ncPassword" autocomplete="current-password" placeholder="app-password fra Nextcloud"></div>
+    <div class="form-group" style="margin-bottom:12px"><label>Filsti i Nextcloud</label><input type="text" id="ncPath" value="kommentarer.json" placeholder="kommentarer.json"></div>
     <div style="display:flex;gap:10px;margin-top:20px">
-              <input type="file" id="commentsFileInput" onchange="document.getElementById('selectedFileName').textContent = this.files[0] ? this.files[0].name : ''" style="display:none">
-              <button class="btn" onclick="document.getElementById('commentsFileInput').click()" style="flex:1">Vælg fil</button>
-              <span id="selectedFileName" style="font-size:0.9rem;color:var(--secondary);margin-left:10px"></span>
-      <button class="btn" onclick="setCommentsPath()">Gem</button>
+      <button class="btn" onclick="saveWebdavConfig()" style="flex:1">Gem</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:15px">
       <button class="btn btn-secondary" onclick="disableComments()">Nej tak</button>
