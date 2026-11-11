@@ -1,4 +1,7 @@
-const CACHE_NAME = 'frekvens';
+// Bump denne version ved hver ny udgivelse af appen, så nye service workers
+// installeres og siden kan vise beskeden "Ny version klar".
+const VERSION = '2026-11-11-1';
+const CACHE_NAME = 'frekvens-' + VERSION;
 
 // ⭐ Inkluder app-shell-filer her. Brug relative stier der matcher din
 // start_url ("./") i manifest.json. Hvis din HTML-fil hedder noget andet
@@ -28,6 +31,11 @@ self.addEventListener('activate', event => {
       )
     ).then(() => self.clients.claim())
   );
+});
+
+// Modtag besked fra siden om at aktivere ny service worker med det samme.
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Offline-first strategi.
