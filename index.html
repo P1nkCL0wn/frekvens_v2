@@ -903,7 +903,7 @@ function disableComments() {
     <h2 style="color:var(--primary);margin-bottom:20px">Kommentarer Opsætning</h2>
     <p style="margin-bottom:20px;color:var(--text)">For at bruge kommentarer skal du angive hvor filen <code>kommentarer.json</code> ligger på din enhed (synkroniseret med Nextcloud).</p>
     <div style="display:flex;gap:10px;margin-top:20px">
-              <input type="file" id="commentsFileInput" accept=".json,application/json,text/plain" onchange="document.getElementById('selectedFileName').textContent = this.files[0] ? this.files[0].name : ''" style="display:none">
+              <input type="file" id="commentsFileInput" onchange="document.getElementById('selectedFileName').textContent = this.files[0] ? this.files[0].name : ''" style="display:none">
               <button class="btn" onclick="document.getElementById('commentsFileInput').click()" style="flex:1">Vælg fil</button>
               <span id="selectedFileName" style="font-size:0.9rem;color:var(--secondary);margin-left:10px"></span>
       <button class="btn" onclick="setCommentsPath()">Gem</button>
