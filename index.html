@@ -140,14 +140,6 @@ tr:hover{background:var(--background)}
 <span class="results-count" id="resultsCount">Indlæser...</span>
 <button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display:none">📥 Eksporter resultater</button>
 </div>
-<div style="margin:15px 0;padding:15px;background:#f0f9ff;border-radius:8px">
-<h3 style="color:var(--primary);margin-bottom:10px">Fil Synkronisering</h3>
-<div style="display:flex;gap:10px;flex-wrap:wrap">
-<button class="btn" onclick="saveCommentsToFile()">💾 Gem til fil</button>
-<button class="btn" onclick="loadCommentsFromFile()">📥 Hent fra fil</button>
-</div>
-<span id="fileStatus" style="font-size:0.85rem;color:var(--secondary);margin-top:5px;display:block"></span>
-</div>
 <div id="loading" class="loading" style="display:none"></div>
 <div id="results" style="display:none">
 <div class="table-container"><table><thead id="tableHeader"></thead><tbody id="tableBody"></tbody></table></div>
