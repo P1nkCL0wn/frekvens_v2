@@ -757,21 +757,28 @@ function loadCommentsFromFile() {
     statusEl.textContent = 'Henter...';
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async function(e) {
+    input.onchange = function(e) {
         const file = e.target.files[0];
         if (file) {
-            try {
-                const text = await file.text();
-                commentMap = JSON.parse(text) || {};
-                localStorage.setItem('frekvensComments', text);
-                statusEl.textContent = '✓ Hentet fra fil!';
-                renderTable();
-                setTimeout(() => statusEl.textContent = '', 3000);
-            } catch (err) {
-                statusEl.textContent = '✗ Fejl: ' + err.message;
-                setTimeout(() => statusEl.textContent = '', 3000);
-            }
+            const reader = new FileReader();
+            reader.onload = async function() {
+                try {
+                    const text = reader.result;
+                    commentMap = JSON.parse(text) || {};
+                    localStorage.setItem('frekvensComments', text);
+                    statusEl.textContent = '✓ Hentet fra fil!';
+                    renderTable();
+                    setTimeout(() => statusEl.textContent = '', 3000);
+                } catch (err) {
+                    statusEl.textContent = '✗ Fejl: ' + err.message;
+                    setTimeout(() => statusEl.textContent = '', 3000);
+                }
+            };
+            reader.onerror = function() {
+                statusEl.textContent = '✗ Kunne ikke læse filen. Sørg for at den er downloadet lokalt (ikke kun i iCloud).';
+                setTimeout(() => statusEl.textContent = '', 5000);
+            };
+            reader.readAsText(file);
         }
     };
     input.click();
@@ -858,11 +865,24 @@ function setCommentsPath() {
     if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            localStorage.setItem('commentsFileContent', e.target.result);
-
+            try {
+                JSON.parse(e.target.result);
+            } catch (err) {
+                alert('Filen er ikke gyldig JSON: ' + err.message);
+                return;
+            }
+            try {
+                localStorage.setItem('commentsFileContent', e.target.result);
+            } catch (err) {
+                alert('Kunne ikke gemme filen lokalt (for stor eller blokeret lager): ' + err.message);
+                return;
+            }
             localStorage.setItem('commentsEnabled', 'true');
             document.getElementById('commentsSetupModal').style.display = 'none';
             updateCommentsUI();
+        };
+        reader.onerror = function() {
+            alert('Kunne ikke læse filen. Sørg for at kommentarer.json er downloadet lokalt på iPad\'en (ikke kun i iCloud).');
         };
         reader.readAsText(file);
     } else {
@@ -883,7 +903,7 @@ function disableComments() {
     <h2 style="color:var(--primary);margin-bottom:20px">Kommentarer Opsætning</h2>
     <p style="margin-bottom:20px;color:var(--text)">For at bruge kommentarer skal du angive hvor filen <code>kommentarer.json</code> ligger på din enhed (synkroniseret med Nextcloud).</p>
     <div style="display:flex;gap:10px;margin-top:20px">
-              <input type="file" id="commentsFileInput" accept=".json" style="display:none">
+              <input type="file" id="commentsFileInput" onchange="document.getElementById('selectedFileName').textContent = this.files[0] ? this.files[0].name : ''" style="display:none">
               <button class="btn" onclick="document.getElementById('commentsFileInput').click()" style="flex:1">Vælg fil</button>
               <span id="selectedFileName" style="font-size:0.9rem;color:var(--secondary);margin-left:10px"></span>
       <button class="btn" onclick="setCommentsPath()">Gem</button>
