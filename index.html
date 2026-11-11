@@ -792,6 +792,18 @@ function updateCommentsUI() {
     if (group) group.style.display = commentsEnabled ? '' : 'none';
     updateColumns();
 }
+function normalizeWebdavConfig(cfg) {
+    if (!cfg) return null;
+    let url = (cfg.url || '').trim().replace(/\/+$/, '');
+    let path = (cfg.path || 'kommentarer.json').trim().replace(/^\/+/, '');
+    const davMarker = '/remote.php/dav/files';
+    const idx = url.indexOf(davMarker);
+    if (idx !== -1) url = url.slice(0, idx);
+    if (cfg.user && path.toLowerCase().startsWith(cfg.user.toLowerCase() + '/')) {
+        path = path.slice(cfg.user.length + 1);
+    }
+    return { ...cfg, url, path };
+}
 function webdavFileUrl() {
     if (!webdavConfig) return null;
     const base = webdavConfig.url.replace(/\/+$/, '');
@@ -803,18 +815,20 @@ function webdavAuth() {
 }
 async function loadCommentsFromWebDAV() {
     const url = webdavFileUrl();
-    if (!url) return;
+    if (!url) return false;
     try {
         const response = await fetch(url, { headers: { 'Authorization': webdavAuth() } });
-        if (response.status === 404) return;
+        if (response.status === 404) return true;
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const text = await response.text();
         commentMap = JSON.parse(text) || {};
         localStorage.setItem('frekvensComments', JSON.stringify(commentMap));
         commentsDirty = false;
         renderTable();
+        return true;
     } catch (err) {
         console.warn('Kunne ikke hente kommentarer fra Nextcloud (bruger lokal kopi):', err.message);
+        return false;
     }
 }
 async function saveCommentsToWebDAV() {
@@ -843,7 +857,7 @@ function syncCommentsIfNeeded() {
 window.addEventListener('DOMContentLoaded', async function() {
     commentsEnabled = localStorage.getItem('commentsEnabled') === 'true';
     try {
-        webdavConfig = JSON.parse(localStorage.getItem('webdavConfig') || 'null');
+        webdavConfig = normalizeWebdavConfig(JSON.parse(localStorage.getItem('webdavConfig') || 'null'));
     } catch (e) {
         webdavConfig = null;
     }
@@ -899,13 +913,16 @@ async function saveWebdavConfig() {
         alert('URL skal starte med https://');
         return;
     }
-    webdavConfig = { url, user, password, path };
+    webdavConfig = normalizeWebdavConfig({ url, user, password, path });
     localStorage.setItem('webdavConfig', JSON.stringify(webdavConfig));
     localStorage.setItem('commentsEnabled', 'true');
     commentsEnabled = true;
     document.getElementById('commentsSetupModal').style.display = 'none';
     updateCommentsUI();
-    await loadCommentsFromWebDAV();
+    const ok = await loadCommentsFromWebDAV();
+    if (!ok) {
+        alert('Kunne ikke kontakte Nextcloud. Tjek at: 1) VPN/Tailscale er tilsluttet på denne enhed, 2) URL kun er roden (f.eks. https://din-adresse.ts.net uden /remote.php), 3) brugernavn og app-password er korrekte. Kommentarer gemmes lokalt indtil videre.');
+    }
     renderTable();
 }
 
@@ -923,10 +940,10 @@ function disableComments() {
   <div style="background:white;padding:30px;border-radius:12px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
     <h2 style="color:var(--primary);margin-bottom:20px">Kommentarer Opsætning</h2>
     <p style="margin-bottom:20px;color:var(--text)">Kommentarer gemmes direkte i <code>kommentarer.json</code> på din Nextcloud via WebDAV. Opret et app-password i Nextcloud under Indstillinger &rarr; Sikkerhed.</p>
-    <div class="form-group" style="margin-bottom:12px"><label>Nextcloud URL</label><input type="url" id="ncUrl" placeholder="https://cloud.eksempel.dk"></div>
+    <div class="form-group" style="margin-bottom:12px"><label>Nextcloud URL (kun roden)</label><input type="url" id="ncUrl" placeholder="https://din-adresse.ts.net (uden /remote.php)"></div>
     <div class="form-group" style="margin-bottom:12px"><label>Brugernavn</label><input type="text" id="ncUser" autocomplete="username" placeholder="dit brugernavn"></div>
     <div class="form-group" style="margin-bottom:12px"><label>App-password</label><input type="password" id="ncPassword" autocomplete="current-password" placeholder="app-password fra Nextcloud"></div>
-    <div class="form-group" style="margin-bottom:12px"><label>Filsti i Nextcloud</label><input type="text" id="ncPath" value="Admin/Frekvenser/kommentarer.json" placeholder="Admin/Frekvenser/kommentarer.json"></div>
+    <div class="form-group" style="margin-bottom:12px"><label>Filsti i Nextcloud (uden brugernavn)</label><input type="text" id="ncPath" value="Frekvenser/kommentarer.json" placeholder="Frekvenser/kommentarer.json"></div>
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn" onclick="saveWebdavConfig()" style="flex:1">Gem</button>
     </div>
